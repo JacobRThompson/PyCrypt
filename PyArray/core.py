@@ -56,9 +56,6 @@ def Encrypt(plaintext: str, cipher=None, map=None, *keywords,
 
     return exec(formula)
 
-
-
-
-
 if __name__ == '__main__' and True:
     import unit_tests
+    unit_tests.Run("encrypt")

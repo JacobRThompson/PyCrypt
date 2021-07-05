@@ -6,6 +6,7 @@ import json
 prevCiphers = [None]
 prevMaps = [None]
 
+
 def LoadPreset(cipher=None, map=None, path="presets.JSON") -> list:
     with open(path, 'r') as infile:
         saveData = json.load(infile)
@@ -42,6 +43,18 @@ def LoadPreset(cipher=None, map=None, path="presets.JSON") -> list:
             out.append(None)
         else:
             raise TypeError
+
+
+def SavePreset(cipher=None, map=None, path="presets.JSON", overwrite=True):
+
+    if cipher:
+        pass
+
+    if map:
+        pass
+
+    pass
+
 
 def Validate(cipher=None, map=None, textLen=5000, keywordLen=25):
    

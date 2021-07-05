@@ -2,6 +2,8 @@ import unittest
 import time
 import numpy as np
 import json
+import sys
+
 from PyArray import core, utils
 
 # ------------------------------------------------------------------------------
@@ -17,18 +19,18 @@ with open('sample.txt') as infile:
         print(f"str_sampleText size:\t{len(str_sampleText)}")
 
 
-def Run(*tests: str):
-    pass
-
 
 class LogTest(unittest.TestCase):
     """ TestCase that automatically logs execution times of tests"""
 
-    def __init__(self,  *args, doLog=True, **kwargs) -> None:
+    def __new__(cls, doLog=True) -> None:
+
+        newInstance = super().__new__(cls)
 
         # flag to use logging (suppressed if doLog_global == False)
-        self._doLog = doLog
-        super().__init__(*args, **kwargs)
+        newInstance._doLog = doLog
+        
+        return newInstance
 
     @property
     def doLog(self):
@@ -54,7 +56,7 @@ class LogTest(unittest.TestCase):
 # Unit Test Definitions
 
 
-class UnitUtils(LogTest):
+class UnUtils(LogTest):
 
     def test_loadPresets(self):
 
@@ -83,7 +85,7 @@ class UnitUtils(LogTest):
         self.assertEqual(dict_failure, None)
 
 
-class UnitEncrypt(LogTest):
+class UnEncrypt(LogTest):
     def test_encodeAndDecode_noMap(self):
 
         arr_encoded = core.Encode(str_sampleText)
@@ -96,6 +98,15 @@ class UnitEncrypt(LogTest):
     def test_VigenereA(self):
         pass
 
+def Run(*tests: str, doLog=True):
 
-# suite = unittest.TestLoader().loadTestsFromTestCase(unCore)
-# unittest.TextTestRunner(verbosity=0).run(suite)
+    str_unTests = ["Un"+test.capitalize() for test in tests]
+
+    # Get the class associated with each string
+    cls_unTests = [getattr(sys.modules[__name__], str) for str in str_unTests]
+
+    # Call .__new__(doLog) on each class
+    obj_unTests = [cls(doLog) for cls in cls_unTests]
+
+    suite = unittest.TestSuite(obj_unTests)
+    unittest.TextTestRunner(verbosity=0).run(suite)
