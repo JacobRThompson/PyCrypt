@@ -1,10 +1,37 @@
 
 import pandas as pd
+import numpy as np
 import json
+import sqlite3
 
-# Flags that prevent us from validating the same template repeatedly
-prevCiphers = [None]
-prevMaps = [None]
+import pickle
+
+# ------------------------------------------------------------------------------
+# SQL\Database Settup
+
+# Register python datatypes (dict, set, np.ndarray) for DB use
+pkl = lambda obj: pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+
+sqlite3.register_adapter(dict      , pkl)
+sqlite3.register_adapter(set       , pkl)
+sqlite3.register_adapter(np.ndarray, pkl)
+
+sqlite3.register_converter("py_dict"   , pickle.loads)
+sqlite3.register_converter("py_set"    , pickle.loads)
+sqlite3.register_converter("py_ndarray", pickle.loads)
+
+# Create Temporary DB that will hold all validated ciphers\maps
+con_mem = sqlite3.connect("file::memory:?cache=shared")
+cur_mem = con_mem.cursor()
+
+with open("init_mem.SQL","r") as infile:
+    cur_mem.executescript(infile.read())
+    con_mem.commit()
+
+
+
+# End of SQL Setup
+# ------------------------------------------------------------------------------
 
 
 def LoadPreset(cipher=None, map=None, path="presets.JSON") -> list:
@@ -89,3 +116,4 @@ def Validate(cipher=None, map=None, textLen=5000, keywordLen=25):
 
     if map not in prevMaps:
         pass
+
