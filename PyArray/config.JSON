@@ -1,0 +1,11 @@
+{
+    "general":{
+        "dbPath": "saveData.db"
+    },
+
+    "unitTests":{
+        "encrypt":true,
+        "utils":true
+    }
+
+}

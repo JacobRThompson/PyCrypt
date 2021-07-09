@@ -1,6 +1,6 @@
--- Script for setting up in-memory database of validated ciphers and maps 
+-- Script for setting up database of  ciphers and maps 
 
-CREATE TABLE ciphers(
+CREATE TABLE IF NOT EXISTS ciphers(
     cipher_name     TEXT PRIMARY KEY,
     no_keywords     INTEGER DEFAULT 0,
 
@@ -9,7 +9,7 @@ CREATE TABLE ciphers(
    
 );
 
-CREATE TABLE maps(
+CREATE TABLE IF NOT EXISTS maps(
     map_name        TEXT PRIMARY KEY,
     no_keywords     INTEGER DEFAULT 0,
 

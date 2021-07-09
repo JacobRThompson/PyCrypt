@@ -1,7 +1,0 @@
-{
-    "doAllowTests":{
-        "encrypt":true,
-        "utils":true
-    }
-
-}

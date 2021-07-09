@@ -1,13 +1,29 @@
+from os import path
 
-import pandas as pd
-import numpy as np
 import json
+import pickle
 import sqlite3
 
-import pickle
+import numpy as np
+
+# Move to parent directory to make getting files cleaner
+path.chdir(path.abspath('..')) 
 
 # ------------------------------------------------------------------------------
 # SQL\Database Settup
+
+def InitDB(*args, **kwargs) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
+    """ Connects to a database using the passed args/kwargs. Then formats DB by
+    creating cipher and map table if they do not already exist. Returns
+    connection and cursor objects used to access database"""
+
+    con = sqlite3.connect(*args,**kwargs)
+    cur = con.cursor()
+    with open("init_db.SQL", "r") as infile:
+        cur.executescript(infile.read())
+        con.commit()
+
+    return con, cur
 
 # Register python datatypes (dict, set, np.ndarray) for DB use
 pkl = lambda obj: pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
@@ -21,14 +37,13 @@ sqlite3.register_converter("py_set"    , pickle.loads)
 sqlite3.register_converter("py_ndarray", pickle.loads)
 
 # Create Temporary DB that will hold all validated ciphers\maps
-con_mem = sqlite3.connect("file::memory:?cache=shared")
-cur_mem = con_mem.cursor()
+con_mem, cur_mem = InitDB("file::memory:?cache=shared")
 
-with open("init_mem.SQL","r") as infile:
-    cur_mem.executescript(infile.read())
-    con_mem.commit()
-
-
+# Create save data DB if it does not exist
+with open ("config.JSON",'r') as infile:
+    dbPath = json.load(infile)["general"]["dbPath"]
+    if not path.exists(dbPath)
+    InitDB(dbPath)
 
 # End of SQL Setup
 # ------------------------------------------------------------------------------
