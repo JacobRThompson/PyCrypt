@@ -7,7 +7,7 @@ import sqlite3
 import numpy as np
 
 # Move to parent directory to make getting files cleaner
-path.chdir(path.abspath('..')) 
+path.chdir(path.abspath('..'))
 
 # ------------------------------------------------------------------------------
 # SQL\Database Settup
@@ -17,7 +17,7 @@ def InitDB(*args, **kwargs) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     creating cipher and map table if they do not already exist. Returns
     connection and cursor objects used to access database"""
 
-    con = sqlite3.connect(*args,**kwargs)
+    con = sqlite3.connect(*args, **kwargs)
     cur = con.cursor()
     with open("init_db.SQL", "r") as infile:
         cur.executescript(infile.read())
@@ -39,52 +39,55 @@ sqlite3.register_converter("py_ndarray", pickle.loads)
 # Create Temporary DB that will hold all validated ciphers\maps
 con_mem, cur_mem = InitDB("file::memory:?cache=shared")
 
-# Create save data DB if it does not exist
-with open ("config.JSON",'r') as infile:
+# Connect/create DB containing savedata
+with open("config.JSON", 'r') as infile:
     dbPath = json.load(infile)["general"]["dbPath"]
-    if not path.exists(dbPath)
-    InitDB(dbPath)
+    con_disk, cur_disk = InitDB(dbPath)
 
 # End of SQL Setup
 # ------------------------------------------------------------------------------
 
 
-def LoadPreset(cipher=None, map=None, path="presets.JSON") -> list:
-    with open(path, 'r') as infile:
-        saveData = json.load(infile)
+def LoadPreset(cipher=None, map=None, path=dbPath) -> list:
+   
+    out = []
+    if type(cipher) == str:
 
-        out = []
-        if type(cipher) == str:
-            # put saveData into dataframe so we can search through it easier
-            df_c = pd.DataFrame.from_records(saveData["ciphers"])
-
-            out.append(df_c.loc[df_c['name'] == cipher])
-
-        # if a dict is passed as a parameter, we assume it contains usable
-        # data for a cipher and pass it through.
-        elif type(cipher) == dict:
-            out.append(cipher)
-
-        elif not cipher:
-            out.append(None)
+        cur_disk.execute(f"SELECT * FROM ciphers WHERE cipher_name = '{cipher}'")
+        result = cur_disk.fetchone()
+        if result:
+            out.append(result)
         else:
-            raise TypeError()
+            raise KeyError(f"Cannot find cipher named '{cipher}' in {dbPath}")
 
-        if type(map) == str:
-            # put saveData into dataframe so we can search through it easier
-            df_m = pd.DataFrame.from_records(saveData["maps"])
+    # If a dict is passed as a parameter, we assume it contains usable
+    # data for a cipher and pass it through.
+    elif type(cipher) == dict:
+        out.append(cipher)
+    elif not cipher:
+        out.append(None)
+    else:
+        raise TypeError(f"Passed cipher '{cipher}' is neither a str or NoneType")
 
-            out.append(df_m.loc[df_m['name'] == map])
+    if type(map) == str:
 
-        # if a map is passed as a parameter, we assume it contains usable
-        # data for a cipher and pass it through.
-        elif type(map) == dict:
-            out.append(map)
-
-        elif not map:
-            out.append(None)
+        cur_disk.execute(f"SELECT * FROM maps WHERE map_name = '{map}'")
+        result = cur_disk.fetchone()
+        if result:
+            out.append(result)
         else:
-            raise TypeError
+            raise KeyError(f"Cannot find map named '{map}' in {dbPath}")
+
+    # If a dict is passed as a parameter, we assume it contains usable
+    # data for a map and pass it through.
+    elif type(cipher) == dict:
+        out.append(cipher)
+    elif not map:
+        out.append(None)
+    else:
+        raise TypeError(f"Passed map '{map}' is neither a str or NoneType")
+
+    return out     
 
 
 def SavePreset(cipher=None, map=None, path="presets.JSON", overwrite=True):

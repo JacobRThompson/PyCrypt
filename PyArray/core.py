@@ -49,9 +49,10 @@ def Restore(unmapped: np.ndarray, original: np.ndarray,
 def Encrypt(plaintext: str, cipher=None, map=None, *keywords,
             usePresets: bool = True):
 
-    if usePresets:
-        cipher, map = utils.LoadPreset(cipher, map)
+    if usePresets and str in (type(cipher), type(map)):
 
+        cipher, map = utils.LoadPreset(cipher, map)
+    
     utils.Validate(cipher, map)
 
     return exec(formula)
