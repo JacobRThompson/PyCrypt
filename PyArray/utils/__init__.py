@@ -6,6 +6,12 @@ import sqlite3
 
 import numpy as np
 
+validCiphers, validMaps = [], []
+
+# will contain sets of the form: {pickle.dumps(cipher), pickle.dumps(map)}
+# to signify valid cipher/map combinations that only work with each other
+validCombo = []  
+
 # Move to parent directory to make getting files cleaner
 path.chdir(path.abspath('..'))
 
@@ -36,9 +42,6 @@ sqlite3.register_converter("py_dict"   , pickle.loads)
 sqlite3.register_converter("py_set"    , pickle.loads)
 sqlite3.register_converter("py_ndarray", pickle.loads)
 
-# Create Temporary DB that will hold all validated ciphers\maps
-con_mem, cur_mem = InitDB("file::memory:?cache=shared")
-
 # Connect/create DB containing savedata
 with open("config.JSON", 'r') as infile:
     dbPath = json.load(infile)["general"]["dbPath"]
@@ -53,7 +56,8 @@ def LoadPreset(cipher=None, map=None, path=dbPath) -> list:
     out = []
     if type(cipher) == str:
 
-        cur_disk.execute(f"SELECT * FROM ciphers WHERE cipher_name = '{cipher}'")
+        cur_disk.execute(f"SELECT * FROM ciphers WHERE cipher_name = '{cipher}'\
+                         LIMIT 1")
         result = cur_disk.fetchone()
         if result:
             out.append(result)
@@ -71,7 +75,8 @@ def LoadPreset(cipher=None, map=None, path=dbPath) -> list:
 
     if type(map) == str:
 
-        cur_disk.execute(f"SELECT * FROM maps WHERE map_name = '{map}'")
+        cur_disk.execute(f"SELECT * FROM maps WHERE map_name = '{map}'\
+                         LIMIT 1")
         result = cur_disk.fetchone()
         if result:
             out.append(result)
@@ -87,7 +92,7 @@ def LoadPreset(cipher=None, map=None, path=dbPath) -> list:
     else:
         raise TypeError(f"Passed map '{map}' is neither a str or NoneType")
 
-    return out     
+    return out
 
 
 def SavePreset(cipher=None, map=None, path="presets.JSON", overwrite=True):
@@ -102,36 +107,46 @@ def SavePreset(cipher=None, map=None, path="presets.JSON", overwrite=True):
 
 
 def Validate(cipher=None, map=None, textLen=5000, keywordLen=25):
-   
-   # TODO: add check that cipher/map is either dict or NoneType
 
-    if cipher not in prevCiphers:
+    def EvalCommand(command, text, keywords):
+        """ Evaluates passed cipher/map command in a scope where it can
+        manipulate variable without breaking the calling function"""
+
+        #NOTE: THIS IS EXTREMELY UNSAFE!!! DON'T BE AN IDIOT ABOUT IT
+        #WE CAN FIX THIS BY PARSING STRING INTO OBJECTS (ast module will help)
+        return exec(command)
+
+    # TODO: Check map/cipher combinations first
+
+    if map not in validMaps:
+        pass
+        #TODO: use difflib.ndiff to compare strings 
+
+
+    if cipher not in validCiphers:
         # Generate completely random unicode string
-        arr_plaintext = np.random.randint(0, 1114112, textLen, dtype = np.int32)
+        plaintext = np.random.randint(0, 1114112, textLen, dtype=np.int32)
 
         # Generate minimum number of keywords to use cipher
-        list_keywords = [np.random.randint(0, 1114112, keywordLen, dtype = np.int32)\
-                         for i in range(cipher["noKeywords"])]
+        keywords = [np.random.randint(0, 1114112, keywordLen, dtype=np.int32)
+                    for i in range(cipher["noKeywords"])]
 
         # Create and format copies of the generated plaintext and keywords that
         # the cipher can play with without breaking everything
-        text = arr_plaintext.copy()
-        keywords = [key.copy() for key in list_keywords]
 
-        arr_encrypted = exec(cipher["formula"])
+        encryptedText = EvalCommand(cipher["cipher_formula"], plaintext,
+                                    keywords)
 
-        # Reassign values so we can decrypt text
-        text = arr_encrypted.copy()
-        keywords = [key.copy() for key in list_keywords]
+        decryptedText = EvalCommand(cipher["cipher_inverse"], plaintext,
+                                    keywords)
 
-        arr_decrypted = exec(cipher["inverse"])
-
-        # If data is lost/changed, raise exception
-        assert np.array_equal(arr_decrypted, arr_plaintext)
+        # If data is lost/changed, raise exception.
+        # TODO: if map passed validation, Try again using mapping/demapping
+        # this time. If it  
+        assert np.array_equal(plaintext, decryptedText)
 
         # Record cipher if it passes all tests
-        prevCiphers.append(cipher)
+        validCiphers.append(cipher)
 
-    if map not in prevMaps:
-        pass
+    
 

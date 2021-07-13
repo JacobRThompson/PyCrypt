@@ -5,8 +5,8 @@ CREATE TABLE IF NOT EXISTS ciphers(
     no_keywords     INTEGER DEFAULT 0,
 
     cipher_formula  TEXT,    
-    cipher_inverse  TEXT    
-   
+    cipher_inverse  TEXT
+        
 );
 
 CREATE TABLE IF NOT EXISTS maps(
