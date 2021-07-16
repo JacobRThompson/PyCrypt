@@ -1,5 +1,8 @@
 """Python script that preforms all heavy lifting for PyArray.dll"""
 
+__version__ = "1.0"
+__author__ = "Jacob Thompson"
+
 import numpy as np
 import utils
 import sqlite3

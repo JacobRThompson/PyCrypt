@@ -19,7 +19,6 @@ with open('sample.txt') as infile:
         print(f"str_sampleText size:\t{len(str_sampleText)}")
 
 
-
 class LogTest(unittest.TestCase):
     """ TestCase that automatically logs execution times of tests"""
 
