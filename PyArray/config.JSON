@@ -6,6 +6,14 @@
     "unitTests":{
         "encrypt":true,
         "utils":true
+    },
+
+    "security":{
+        "useSecurityTests":true,
+        "trustedImports":[
+            "numpy"
+        ]
+
     }
 
 }
