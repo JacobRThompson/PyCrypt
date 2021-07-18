@@ -1,23 +1,9 @@
 import unittest
 import time
-import numpy as np
+import importlib
 import json
-import sys
 
-from PyArray import core, utils
-
-# ------------------------------------------------------------------------------
-# Global definitions and setup
-
-doLog_global = True
-
-with open('sample.txt') as infile:
-    str_sampleText = infile.readline()
-    arr_sampleText = core.Encode(str_sampleText)
-
-    if doLog_global:
-        print(f"str_sampleText size:\t{len(str_sampleText)}")
-
+from os import path
 
 class LogTest(unittest.TestCase):
     """ TestCase that automatically logs execution times of tests"""
@@ -28,12 +14,26 @@ class LogTest(unittest.TestCase):
 
         # flag to use logging (suppressed if doLog_global == False)
         newInstance._doLog = doLog
-        
+
         return newInstance
 
     @property
     def doLog(self):
-        return self._doLog if doLog_global else False
+        # NOTE: We always re-lookup config file in case its contents have
+        # changed.
+
+        # Get the name of the class invoking this method
+        className = self.__class__.__name__
+
+        # Open and then read the unitTests section of config file
+        with open(path.join(path.abspath('..'), "config.JSON"), 'r') as config:
+            settings = json.load(config)["unitTests"]
+
+            # check if there any flags that suppress logging, then act accordingly
+            if not settings["doLog_global"] or not settings[className]["doLog"]:
+                return False
+            else:
+                return self._doLog
 
     @doLog.setter
     def doLog(self, x):
@@ -51,8 +51,15 @@ class LogTest(unittest.TestCase):
             t = time.time()-self.startTime
             print(f"t:\t{t}")
 
-# ------------------------------------------------------------------------------
-# Unit Test Definitions
+"""
+Old tests
+
+with open('sample.txt') as infile:
+    str_sampleText = infile.readline()
+    arr_sampleText = core.Encode(str_sampleText)
+
+    if doLog_global:
+        print(f"str_sampleText size:\t{len(str_sampleText)}")
 
 
 class UnUtils(LogTest):
@@ -97,15 +104,9 @@ class UnEncrypt(LogTest):
     def test_VigenereA(self):
         pass
 
-def Run(*tests: str, doLog=True):
-
-    str_unTests = ["Un"+test.capitalize() for test in tests]
-
-    # Get the class associated with each string
-    cls_unTests = [getattr(sys.modules[__name__], str) for str in str_unTests]
-
-    # Call .__new__(doLog) on each class
-    obj_unTests = [cls(doLog) for cls in cls_unTests]
+def RunTest(filename: str, classname: str):
 
     suite = unittest.TestSuite(obj_unTests)
     unittest.TextTestRunner(verbosity=0).run(suite)
+
+"""

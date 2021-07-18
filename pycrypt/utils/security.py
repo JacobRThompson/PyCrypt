@@ -1,4 +1,5 @@
 import ast
+from pycrypt.unit_tests import LogTest
 
 import numpy as np
 
@@ -113,6 +114,8 @@ e=d
 
 '''
 
+
 evalSafety(string)
 
-
+if __name__ == "__main__" and False:
+    from unit_tests import un_security

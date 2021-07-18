@@ -3,17 +3,18 @@
         "dbPath": "saveData.db"
     },
 
-    "unitTests":{
-        "encrypt":true,
-        "utils":true
-    },
-
     "security":{
         "useSecurityTests":true,
         "trustedImports":[
             "numpy"
         ]
 
+    },
+
+    "unitTests":{
+        "doLog_global":true,
+        "UnValidate":{  "doRun":true,"doLog": true }
+        
     }
 
 }
