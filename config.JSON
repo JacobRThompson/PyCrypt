@@ -1,6 +1,7 @@
 {
     "general":{
-        "dbPath": "saveData.db"
+        "dbPath" : "saveData.db",
+        "TCPPort": 5432
     },
 
     "security":{

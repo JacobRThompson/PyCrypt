@@ -1,5 +1,5 @@
 import ast
-from pycrypt.unit_tests import LogTest
+from unit_tests import LogTest
 
 import numpy as np
 

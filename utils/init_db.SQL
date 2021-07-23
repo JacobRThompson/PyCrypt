@@ -1,4 +1,5 @@
--- Script for setting up database of  ciphers and maps 
+    
+BEGIN;
 
 CREATE TABLE IF NOT EXISTS ciphers(
     cipher_id   INTEGER PRIMARY KEY,
@@ -28,4 +29,4 @@ CREATE TABLE IF NOT EXISTS maps(
     equalities  py_dict
 );
 
-
+COMMIT;

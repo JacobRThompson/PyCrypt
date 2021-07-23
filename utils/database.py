@@ -1,65 +1,45 @@
-from os import path
+import os
 
+import getpass
 import json
 import pickle
-import sqlite3
+import pg8000
 
 import numpy as np
+username = getpass.getuser()
+
+with open("config.JSON", 'r') as config:
+    settings = json.load(config)
+    dbPath = settings["general"]["dbPath"]
+    portNo = settings["general"]["TCPPort"]
+    del(settings)
+
+# Move to parent directory to make getting files cleaner
+os.chdir(os.path.abspath('..'))
 
 validCiphers, validMaps = [], []
 
-# will contain sets of the form: {pickle.dumps(cipher), pickle.dumps(map)}
-# to signify valid cipher/map combinations that only work with each other
-validCombo = []
-
-pickles ={}
-# Move to parent directory to make getting files cleaner
-path.chdir(path.abspath('..'))
-
-# ------------------------------------------------------------------------------
-# SQL\Database Settup
-
-def InitDB(*args, **kwargs) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
-    """ Connects to a database using the passed args/kwargs. Then formats DB by
-    creating cipher and map table if they do not already exist. Returns
-    connection and cursor objects used to access database"""
-
-    con = sqlite3.connect(*args, **kwargs)
+if os.path.isfile(dbPath):     # Check if the database exists
+    con = pg8000.connect(user=username, database=dbPath, port=portNo)
     cur = con.cursor()
-    with open("init_db.SQL", "r") as infile:
-        cur.executescript(infile.read())
-        con.commit()
 
-    return con, cur
 
-# Register python datatypes (dict, set, np.ndarray) for DB use
-def _Pkl(obj): return pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
-
-sqlite3.register_adapter(dict      , _Pkl)
-sqlite3.register_adapter(set       , _Pkl)
-sqlite3.register_adapter(np.ndarray, _Pkl)
-
-sqlite3.register_converter("py_dict"   , pickle.loads)
-sqlite3.register_converter("py_set"    , pickle.loads)
-sqlite3.register_converter("py_ndarray", pickle.loads)
-
-# Connect/create DB containing savedata
-with open("config.JSON", 'r') as infile:
-    dbPath = json.load(infile)["general"]["dbPath"]
-    con_disk, cur_disk = InitDB(dbPath)
-
-# End of SQL Setup
-# ------------------------------------------------------------------------------
-
+# TODO: CREATE THE DATABASE FILE BEFORE CONNECTING TO IT
+else:       # Creating database requires superuser privileges
+    con = pg8000.connect(user='postgres', password=getpass.getpass(),
+                          port=portNo) #database=dbPath,
+    cur = con.cursor()
+    with open("init_db.SQL",'r') as infile:
+        con.run(infile.read())
 
 def LoadPreset(cipher=None, map=None, path=dbPath) -> list:
    
     out = []
     if type(cipher) == str:
 
-        cur_disk.execute(f"SELECT * FROM ciphers WHERE cipher_name = '{cipher}'\
+        cur.execute(f"SELECT * FROM ciphers WHERE cipher_name = '{cipher}'\
                          LIMIT 1")
-        result = cur_disk.fetchone()
+        result = cur.fetchone()
         if result:
             out.append(result)
         else:
@@ -76,9 +56,9 @@ def LoadPreset(cipher=None, map=None, path=dbPath) -> list:
 
     if type(map) == str:
 
-        cur_disk.execute(f"SELECT * FROM maps WHERE map_name = '{map}'\
+        cur.execute(f"SELECT * FROM maps WHERE map_name = '{map}'\
                          LIMIT 1")
-        result = cur_disk.fetchone()
+        result = cur.fetchone()
         if result:
             out.append(result)
         else:
