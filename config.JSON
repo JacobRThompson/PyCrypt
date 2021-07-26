@@ -1,7 +1,9 @@
 {
     "general":{
-        "dbPath" : "saveData.db",
-        "TCPPort": 5432
+        "dbPath" : "dbFiles",
+        "dbName" : "cipherData",
+        "TCPPort": 5432,
+        "doCreateDirectory":true
     },
 
     "security":{

@@ -9,28 +9,63 @@ import numpy as np
 username = getpass.getuser()
 
 with open("config.JSON", 'r') as config:
-    settings = json.load(config)
-    dbPath = settings["general"]["dbPath"]
-    portNo = settings["general"]["TCPPort"]
+    settings = json.load(config)["general"]
+    dbPath = settings["dbPath"]
+    dbName = settings["dbName"]
+    portNo = settings["TCPPort"]
+    doCreateDirectory = settings["doCreateDirectory"]
     del(settings)
 
 # Move to parent directory to make getting files cleaner
-os.chdir(os.path.abspath('..'))
+os.chdir(os.path.abspath('.'))
 
 validCiphers, validMaps = [], []
 
-if os.path.isfile(dbPath):     # Check if the database exists
-    con = pg8000.connect(user=username, database=dbPath, port=portNo)
+# For testing purposes to avoid constant retyping of password
+with open("C:/Users/jacob/Desktop/postgreSQL_password.txt", 'r') as infile:
+    password = infile.readline()
+
+try:
+    # con = pg8000.connect(user=username, database=dbName, port=portNo)
+    con = pg8000.connect(user='postgres', password=password, database=dbName,
+                         port=portNo)
     cur = con.cursor()
 
+# if db does not exist, we create it
+except: # TODO: FILTER EXCEPTIONS, DEAL WITH ALREADY EXISTING pyCrypt TABLESPACE
 
-# TODO: CREATE THE DATABASE FILE BEFORE CONNECTING TO IT
-else:       # Creating database requires superuser privileges
-    con = pg8000.connect(user='postgres', password=getpass.getpass(),
-                          port=portNo) #database=dbPath,
+    if not os.path.isdir(dbPath) and doCreateDirectory:
+        os.mkdir(dbPath)
+    else:
+        # If we don't create a new directory, we make sure that the new one is
+        # empty or contains a database
+        assert len(os.listdir(dbPath)) == 0,\
+            f" Database '{dbName}' was not found, but its target directory \
+            '{dbPath}' was.An attempt was made to load or create a database \
+            here, but non-database files were found at {dbPath}."
+
+    dbAbsPath = os.path.join(os.getcwd(), dbPath)
+
+    con = pg8000.connect(user='postgres', password=password, port=portNo)
+
+    # Turn on automommit so that we don't run the following in a transaction
+    # (Which is not allowed by postgreSQL)
+    con.autocommit = True
+    con.run(f"CREATE TABLESPACE pyCrypt LOCATION '{dbAbsPath}'")
+    con.run(f"CREATE DATABASE {dbName} WITH TABLESPACE = pyCrypt")
+    con.autocommit = False
+    con.close()
+
+    # (Once implemented) reconnect with lower privileges so we don't accidentally
+    # do something stupid
+    con = pg8000.connect(user='postgres', password=password, database=dbName,
+                         port=portNo)
     cur = con.cursor()
-    with open("init_db.SQL",'r') as infile:
+
+    with open("init_db.SQL", 'r') as infile:
         con.run(infile.read())
+
+    cur = con.cursor()
 
 def LoadPreset(cipher=None, map=None, path=dbPath) -> list:
    
@@ -129,4 +164,4 @@ def Validate(cipher=None, map=None, textLen=5000, keywordLen=25):
         # Record cipher if it passes all tests
         validCiphers.append(cipher)
 
-    
+print("Done. Somehow.")
