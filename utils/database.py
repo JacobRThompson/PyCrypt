@@ -1,64 +1,60 @@
-import os
 
 import getpass
 import json
-import pickle
+import ntsecuritycon
+import os
 import pg8000
+import win32security
 
 import numpy as np
-username = getpass.getuser()
+#username = getpass.getuser()
 
 with open("config.JSON", 'r') as config:
     settings = json.load(config)["general"]
-    dbPath = settings["dbPath"]
-    dbName = settings["dbName"]
     portNo = settings["TCPPort"]
-    doCreateDirectory = settings["doCreateDirectory"]
-    del(settings)
+
+    del settings
+    del config
 
 # Move to parent directory to make getting files cleaner
 os.chdir(os.path.abspath('.'))
 
-validCiphers, validMaps = [], []
+# validCiphers, validMaps = [], []
+
+def GiveAllPermissions(path):
+
+    usr, domain, type = win32security.LookupAccountName("", "Everyone")
+
+    sd = win32security.GetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION)
+    dacl = sd.GetSecurityDescriptorDacl()
+    dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_ALL_ACCESS, usr)
+
+    sd.SetSecurityDescriptorDacl(1, dacl, 0)
+    win32security.SetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION, sd)
+
 
 # For testing purposes to avoid constant retyping of password
 with open("C:/Users/jacob/Desktop/postgreSQL_password.txt", 'r') as infile:
     password = infile.readline()
+    del infile
 
-try:
+if False:
     # con = pg8000.connect(user=username, database=dbName, port=portNo)
     con = pg8000.connect(user='postgres', password=password, database=dbName,
                          port=portNo)
     cur = con.cursor()
 
 # if db does not exist, we create it
-except: # TODO: FILTER EXCEPTIONS, DEAL WITH ALREADY EXISTING pyCrypt TABLESPACE
-
-    if not os.path.isdir(dbPath) and doCreateDirectory:
-        os.mkdir(dbPath)
-    else:
-        # If we don't create a new directory, we make sure that the new one is
-        # empty or contains a database
-        assert len(os.listdir(dbPath)) == 0,\
-            f" Database '{dbName}' was not found, but its target directory \
-            '{dbPath}' was.An attempt was made to load or create a database \
-            here, but non-database files were found at {dbPath}."
-
-    dbAbsPath = os.path.join(os.getcwd(), dbPath)
-
+else:
     con = pg8000.connect(user='postgres', password=password, port=portNo)
 
-    # Turn on automommit so that we don't run the following in a transaction
-    # (Which is not allowed by postgreSQL)
     con.autocommit = True
-    con.run(f"CREATE TABLESPACE pyCrypt LOCATION '{dbAbsPath}'")
-    con.run(f"CREATE DATABASE {dbName} WITH TABLESPACE = pyCrypt")
-    con.autocommit = False
+    con.run("CREATE DATABASE pycrypt")
     con.close()
 
     # (Once implemented) reconnect with lower privileges so we don't accidentally
     # do something stupid
-    con = pg8000.connect(user='postgres', password=password, database=dbName,
+    con = pg8000.connect(user='postgres', password=password, database="pycrypt",
                          port=portNo)
     cur = con.cursor()
 
@@ -163,5 +159,7 @@ def Validate(cipher=None, map=None, textLen=5000, keywordLen=25):
 
         # Record cipher if it passes all tests
         validCiphers.append(cipher)
+
+
 
 print("Done. Somehow.")
