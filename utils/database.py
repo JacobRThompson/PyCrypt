@@ -1,70 +1,60 @@
 
-import getpass
 import json
-import ntsecuritycon
-import os
 import pg8000
-import win32security
 
 import numpy as np
-#username = getpass.getuser()
-
-with open("config.JSON", 'r') as config:
-    settings = json.load(config)["general"]
-    portNo = settings["TCPPort"]
-
-    del settings
-    del config
-
-# Move to parent directory to make getting files cleaner
-os.chdir(os.path.abspath('.'))
 
 # validCiphers, validMaps = [], []
-
-def GiveAllPermissions(path):
-
-    usr, domain, type = win32security.LookupAccountName("", "Everyone")
-
-    sd = win32security.GetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION)
-    dacl = sd.GetSecurityDescriptorDacl()
-    dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_ALL_ACCESS, usr)
-
-    sd.SetSecurityDescriptorDacl(1, dacl, 0)
-    win32security.SetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION, sd)
+con: pg8000.Connection = None
 
 
-# For testing purposes to avoid constant retyping of password
-with open("C:/Users/jacob/Desktop/postgreSQL_password.txt", 'r') as infile:
-    password = infile.readline()
-    del infile
+def init() -> pg8000.Connection:
 
-if False:
-    # con = pg8000.connect(user=username, database=dbName, port=portNo)
-    con = pg8000.connect(user='postgres', password=password, database=dbName,
-                         port=portNo)
-    cur = con.cursor()
+    global con
 
-# if db does not exist, we create it
-else:
-    con = pg8000.connect(user='postgres', password=password, port=portNo)
+    with open("config.JSON", 'r') as config:
+        settings = json.load(config)["general"]
+        portNo = settings["TCPPort"]
 
-    con.autocommit = True
-    con.run("CREATE DATABASE pycrypt")
-    con.close()
+        del settings
 
-    # (Once implemented) reconnect with lower privileges so we don't accidentally
-    # do something stupid
-    con = pg8000.connect(user='postgres', password=password, database="pycrypt",
-                         port=portNo)
-    cur = con.cursor()
+    # Used for testing purposes to avoid constant retyping of password
+    # TODO: IMPLEMENT PROPER SYSTEM
+    with open("C:/Users/jacob/Desktop/postgreSQL_password.txt", 'r') as infile:
+        password = infile.readline()
 
-    with open("init_db.SQL", 'r') as infile:
-        con.run(infile.read())
+    try:
+        con = pg8000.connect(user="pycrypt_default_user", database="pycrypt",
+                            port=portNo)
+    except Exception as e:
+        print(f"exception of type '{e.__class__.__name__}' occurred")
 
-    cur = con.cursor()
+        _con = pg8000.connect(user='postgres', password=password, port=portNo)
+        _con.autocommit = True
 
-def LoadPreset(cipher=None, map=None, path=dbPath) -> list:
+        # Create default user if it does not exist
+        with open("utils\\createUser.SQL",'r') as infile:
+            _con.run(infile.read())
+
+        _con.run("CREATE DATABASE IF NOT EXISTS pycrypt")
+
+        # Format DB if necessary
+        with open("utils/initDB.SQL", 'r') as infile:
+            _con.run(infile.read())
+
+        _con.autocommit = False
+        _con.close()
+
+        # Reconnect with lower privileges
+        con = pg8000.connect(user="pycrypt_default_user", database="pycrypt",
+                            port=portNo)
+
+    return con
+
+def LoadPreset(cipher=None, map=None) -> list:
    
+    assert con
+
     out = []
     if type(cipher) == str:
 
