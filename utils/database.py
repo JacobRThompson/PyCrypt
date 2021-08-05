@@ -26,19 +26,19 @@ def init() -> pg8000.Connection:
     try:
         con = pg8000.connect(user="pycrypt_default_user", database="pycrypt",
                             port=portNo)
+
+        # TODO: Raise separate exception if the pg_trgm extension cannot be
+        # loaded
+
     except Exception as e:
         print(f"exception of type '{e.__class__.__name__}' occurred")
 
         _con = pg8000.connect(user='postgres', password=password, port=portNo)
         _con.autocommit = True
 
-        # Create default user if it does not exist
-        with open("utils\\createUser.SQL",'r') as infile:
+        with open("utils/startup.SQL", 'r') as infile:
             _con.run(infile.read())
 
-        _con.run("CREATE DATABASE IF NOT EXISTS pycrypt")
-
-        # Format DB if necessary
         with open("utils/initDB.SQL", 'r') as infile:
             _con.run(infile.read())
 

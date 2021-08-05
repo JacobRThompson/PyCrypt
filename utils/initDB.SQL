@@ -1,32 +1,50 @@
     
 BEGIN;
 
-    CREATE TABLE IF NOT EXISTS ciphers(
-        cipher_id   SERIAL NOT NULL PRIMARY KEY,
+    CREATE EXTENSION pg_trgm IF NOT EXISTS;
 
-        "name"      TEXT,
-        "hash"      TEXT,
-        pickle      TEXT NOT NULL,
-        keywords    json,
+    IF NOT EXISTS ciphers THEN
+        CREATE TABLE ciphers(
+            cipher_id       INT GENERATED ALWAYS AS IDENTITY,
+            
+            cipher_name     TEXT,
+            cipher_hash     TEXT,
+            cipher_pickle   TEXT,
+            cipher_keywords TEXT[],
 
-        formula     TEXT NOT NULL,    
-        inverse     TEXT  
-    );
+            cipher_formula  TEXT NOT NULL,    
+            cipher_inverse  TEXT,  
 
-    CREATE TABLE IF NOT EXISTS maps(
-        map_id      SERIAL NOT NULL PRIMARY KEY,
-        cipher_id   INTEGER,
+            dep_id          INT,
+
+            CONSTRAINT cipher_dependency
+                FOREIGN KEY(dep_id) REFERENCES maps(map_id)
+        );
+
+        CREATE INDEX idx_cipher_name ON ciphers USING GIN (cipher_name gin_trgm_ops); 
+        CREATE INDEX idx_cipher_keywords ON ciphers USING GIN (cipher_keywords);
         
-        "name"      TEXT,
-        "hash"      TEXT,
-        pickle      TEXT,
-        keywords    json,
+    END IF;
 
-        transform   json NOT NULL,
-        inverse     json NOT NULL,
-        domain      json,
-        "range"     json,
-        equalities  json
-    );
+    IF NOT EXISTS maps THEN
+        CREATE TABLE maps(
+            map_id      INT GENERATED ALWAYS AS IDENTITY,
+            
+            map_name        TEXT,
+            map_hash        TEXT,
+            map_pickle      TEXT,
+            map_keywords    TEXT[],
+
+            map_transform   JSON NOT NULL,
+            map_inverse     JSON NOT NULL,
+            map_domain      INTEGER[],
+            map_range       INTEGER[],
+            map_equalities  INTEGER[]
+        );
+
+        CREATE INDEX idx_map_name ON maps USING GIN (map_name gin_trgm_ops);
+        CREATE INDEX idx_map_keywords ON maps USING GIN (map_keywords);
+        
+    END IF;
 
 COMMIT;
