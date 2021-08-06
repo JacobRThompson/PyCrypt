@@ -16,8 +16,6 @@ def init() -> pg8000.Connection:
         settings = json.load(config)["general"]
         portNo = settings["TCPPort"]
 
-        del settings
-
     # Used for testing purposes to avoid constant retyping of password
     # TODO: IMPLEMENT PROPER SYSTEM
     with open("C:/Users/jacob/Desktop/postgreSQL_password.txt", 'r') as infile:
@@ -25,29 +23,46 @@ def init() -> pg8000.Connection:
 
     try:
         con = pg8000.connect(user="pycrypt_default_user", database="pycrypt",
-                            port=portNo)
+                             port=portNo, password="123")
 
-        # TODO: Raise separate exception if the pg_trgm extension cannot be
-        # loaded
+    except:
 
-    except Exception as e:
-        print(f"exception of type '{e.__class__.__name__}' occurred")
-
+        # connect as a superuser so we can create things as needed
         _con = pg8000.connect(user='postgres', password=password, port=portNo)
-        _con.autocommit = True
 
-        with open("utils/startup.SQL", 'r') as infile:
+        with open("utils/queryCreateDB.SQL", 'r') as infile:
+            doCreateDB = _con.run(infile.read())[0][0]
+
+        if doCreateDB:
+
+            # Make sure we are not inside a transaction (It's jank. see pg8000
+            # docs for more info)
+            _con.rollback()
+            _con.autocommit = True
+            _con.run("CREATE DATABASE pycrypt")
+            _con.autocommit = False
+
+        with open("utils/initUser.SQL", 'r') as infile:
             _con.run(infile.read())
+
+        # TODO: Query if extension is available & create procedure for install
+
+        _con.commit()
+        _con.close
+
+        # Connect to DB so we can modify it
+        _con = pg8000.connect(user='postgres', database="pycrypt",
+                              password=password, port=portNo)
 
         with open("utils/initDB.SQL", 'r') as infile:
             _con.run(infile.read())
-
-        _con.autocommit = False
+            _con.commit()
         _con.close()
 
         # Reconnect with lower privileges
+        # TODO: GIVE DEFAULT USER A TERRIBLE PASSWORD
         con = pg8000.connect(user="pycrypt_default_user", database="pycrypt",
-                            port=portNo)
+                             port=portNo, password="123")
 
     return con
 
@@ -150,6 +165,6 @@ def Validate(cipher=None, map=None, textLen=5000, keywordLen=25):
         # Record cipher if it passes all tests
         validCiphers.append(cipher)
 
-
+init()
 
 print("Done. Somehow.")
