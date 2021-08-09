@@ -36,7 +36,8 @@ BEGIN
 	THEN
         CREATE TABLE ciphers(
             cipher_id       INT GENERATED ALWAYS AS IDENTITY,
-            
+            map_id          INT,
+
             cipher_name     TEXT,
             cipher_hash     TEXT,
             cipher_pickle   TEXT,
@@ -45,14 +46,14 @@ BEGIN
             cipher_formula  TEXT NOT NULL,    
             cipher_inverse  TEXT,  
 
-            dep_id          INT,
-
+            
 			PRIMARY KEY (cipher_id),
-            CONSTRAINT cipher_dependency
-                FOREIGN KEY(dep_id) REFERENCES maps(map_id)
+            CONSTRAINT cipher_map
+                FOREIGN KEY(map_id) REFERENCES maps(map_id)
         );
 
         CREATE INDEX idx_cipher_name ON ciphers USING GIN (cipher_name gin_trgm_ops); 
         CREATE INDEX idx_cipher_keywords ON ciphers USING GIN (cipher_keywords);
     END IF;
-END $$;
+END 
+$$;

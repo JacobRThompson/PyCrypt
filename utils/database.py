@@ -22,15 +22,16 @@ def init() -> pg8000.Connection:
         password = infile.readline()
 
     try:
-        con = pg8000.connect(user="pycrypt_default_user", database="pycrypt",
-                             port=portNo, password="123")
+        con = pg8000.connect(
+            user="pycrypt_default_user", database="pycrypt", port=portNo,
+            password="123")
 
     except:
 
         # connect as a superuser so we can create things as needed
         _con = pg8000.connect(user='postgres', password=password, port=portNo)
 
-        with open("utils/queryCreateDB.SQL", 'r') as infile:
+        with open("utils/queryDoCreateDB.SQL", 'r') as infile:
             doCreateDB = _con.run(infile.read())[0][0]
 
         if doCreateDB:
@@ -51,8 +52,9 @@ def init() -> pg8000.Connection:
         _con.close
 
         # Connect to DB so we can modify it
-        _con = pg8000.connect(user='postgres', database="pycrypt",
-                              password=password, port=portNo)
+        _con = pg8000.connect(
+            user='postgres', database="pycrypt", password=password,
+            port=portNo)
 
         with open("utils/initDB.SQL", 'r') as infile:
             _con.run(infile.read())
@@ -61,55 +63,42 @@ def init() -> pg8000.Connection:
 
         # Reconnect with lower privileges
         # TODO: GIVE DEFAULT USER A TERRIBLE PASSWORD
-        con = pg8000.connect(user="pycrypt_default_user", database="pycrypt",
-                             port=portNo, password="123")
+        con = pg8000.connect(
+            user="pycrypt_default_user", database="pycrypt", port=portNo,
+            password="123")
 
     return con
 
+
 def LoadPreset(cipher=None, map=None) -> list:
-   
+    assert cipher is None or type(cipher) == str
+    assert map is None or type(map) == str
+
+    # Make sure that we initalized module
     assert con
 
-    out = []
-    if type(cipher) == str:
-
-        cur.execute(f"SELECT * FROM ciphers WHERE cipher_name = '{cipher}'\
-                         LIMIT 1")
-        result = cur.fetchone()
-        if result:
-            out.append(result)
-        else:
-            raise KeyError(f"Cannot find cipher named '{cipher}' in {dbPath}")
-
-    # If a dict is passed as a parameter, we assume it contains usable
-    # data for a cipher and pass it through.
-    elif type(cipher) == dict:
-        out.append(cipher)
-    elif not cipher:
-        out.append(None)
+    if map:
+        mapQuery = con.run(f"SELECT * FROM maps WHERE map_name ={map}")
+        assert mapQuery != [None]
     else:
-        raise TypeError(f"Passed cipher '{cipher}' is neither a str or NoneType")
+        mapQuery = None
 
-    if type(map) == str:
+    if cipher:
+        cipherQuery = con.run(f"SELECT * FROM ciphers WHERE cipher_name={cipher}")
+        assert cipherQuery != [None]
 
-        cur.execute(f"SELECT * FROM maps WHERE map_name = '{map}'\
-                         LIMIT 1")
-        result = cur.fetchone()
-        if result:
-            out.append(result)
-        else:
-            raise KeyError(f"Cannot find map named '{map}' in {dbPath}")
+        # If cipher has a listed map dependency...
+        if cipherQuery[1] is not None:
+            # and if the user passed a map query...
+            if mapQuery:
+                # we make sure the passed query and cipher dependency are one
+                # and the same
+                assert cipherQuery[1] == mapQuery[0]
+            else:
+                # otherwise we look up the listed dependency
+                mapQuery = con.run(f"SELECT * FROM maps WHERE map_id = {cipherQuery[1]}")
 
-    # If a dict is passed as a parameter, we assume it contains usable
-    # data for a map and pass it through.
-    elif type(cipher) == dict:
-        out.append(cipher)
-    elif not map:
-        out.append(None)
-    else:
-        raise TypeError(f"Passed map '{map}' is neither a str or NoneType")
-
-    return out
+    return (cipherQuery, mapQuery)
 
 
 def SavePreset(cipher=None, map=None, path="presets.JSON", overwrite=True):
