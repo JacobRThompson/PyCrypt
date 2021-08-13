@@ -1,7 +1,6 @@
 DO $$    
 BEGIN
 	CREATE EXTENSION IF NOT EXISTS pg_trgm;
-	
     IF NOT EXISTS (
 		SELECT FROM information_schema.tables
 		WHERE table_schema = 'public'
@@ -12,7 +11,7 @@ BEGIN
             
             map_name        TEXT,
             map_hash        TEXT,
-            map_pickle      TEXT,
+
             map_keywords    TEXT[],
 
             map_transform   JSON NOT NULL,
@@ -40,7 +39,7 @@ BEGIN
 
             cipher_name     TEXT,
             cipher_hash     TEXT,
-            cipher_pickle   TEXT,
+            
             cipher_keywords TEXT[],
 
             cipher_formula  TEXT NOT NULL,    

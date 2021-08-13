@@ -1,8 +1,9 @@
 
 import json
 import pg8000
-
 import numpy as np
+
+from security import hash
 
 # validCiphers, validMaps = [], []
 con: pg8000.Connection = None
@@ -16,26 +17,25 @@ def init() -> pg8000.Connection:
         settings = json.load(config)["general"]
         portNo = settings["TCPPort"]
 
-    # Used for testing purposes to avoid constant retyping of password
-    # TODO: IMPLEMENT PROPER SYSTEM
-    with open("C:/Users/jacob/Desktop/postgreSQL_password.txt", 'r') as infile:
-        password = infile.readline()
-
     try:
         con = pg8000.connect(
             user="pycrypt_default_user", database="pycrypt", port=portNo,
             password="123")
 
-    except:
+    except pg8000.dbapi.ProgrammingError:
+
+        # Used for testing purposes to avoid constant retyping of password
+        # TODO: IMPLEMENT PROPER SYSTEM
+        with open("C:/Users/jacob/Desktop/postgreSQL_password.txt", 'r') as infile:
+            password = infile.readline()
 
         # connect as a superuser so we can create things as needed
         _con = pg8000.connect(user='postgres', password=password, port=portNo)
 
-        with open("utils/queryDoCreateDB.SQL", 'r') as infile:
+        with open("database/queryDoCreateDB.SQL", 'r') as infile:
             doCreateDB = _con.run(infile.read())[0][0]
 
         if doCreateDB:
-
             # Make sure we are not inside a transaction (It's jank. see pg8000
             # docs for more info)
             _con.rollback()
@@ -43,12 +43,12 @@ def init() -> pg8000.Connection:
             _con.run("CREATE DATABASE pycrypt")
             _con.autocommit = False
 
-        with open("utils/initUser.SQL", 'r') as infile:
+        with open("database/initUser.SQL", 'r') as infile:
             _con.run(infile.read())
 
-        # TODO: Query if extension is available & create procedure for install
+            # TODO: Query if extension is available & create procedure for install
 
-        _con.commit()
+            _con.commit()
         _con.close
 
         # Connect to DB so we can modify it
@@ -56,7 +56,7 @@ def init() -> pg8000.Connection:
             user='postgres', database="pycrypt", password=password,
             port=portNo)
 
-        with open("utils/initDB.SQL", 'r') as infile:
+        with open("database/initDB.SQL", 'r') as infile:
             _con.run(infile.read())
             _con.commit()
         _con.close()
@@ -73,19 +73,17 @@ def init() -> pg8000.Connection:
 def LoadPreset(cipher=None, map=None) -> list:
     assert cipher is None or type(cipher) == str
     assert map is None or type(map) == str
-
-    # Make sure that we initalized module
-    assert con
+    assert con  # Make sure that we initalized module
 
     if map:
-        mapQuery = con.run(f"SELECT * FROM maps WHERE map_name ={map}")
-        assert mapQuery != [None]
+        mapQuery = con.run(f"SELECT * FROM maps WHERE map_name ={map}")[0]
+        assert mapQuery is not None
     else:
         mapQuery = None
 
     if cipher:
-        cipherQuery = con.run(f"SELECT * FROM ciphers WHERE cipher_name={cipher}")
-        assert cipherQuery != [None]
+        cipherQuery = con.run(f"SELECT * FROM ciphers WHERE cipher_name={cipher}")[0]
+        assert cipherQuery is not None
 
         # If cipher has a listed map dependency...
         if cipherQuery[1] is not None:
@@ -96,12 +94,19 @@ def LoadPreset(cipher=None, map=None) -> list:
                 assert cipherQuery[1] == mapQuery[0]
             else:
                 # otherwise we look up the listed dependency
-                mapQuery = con.run(f"SELECT * FROM maps WHERE map_id = {cipherQuery[1]}")
+                mapQuery = con.run(f"SELECT * FROM maps WHERE map_id = {cipherQuery[1]}")[0]
+    else:
+        cipherQuery = None
+
+    # Validate hashes of retrieved cipher and/or map
+    if mapQuery:
+        assert hash.GenHash(mapQuery) == mapQuery[2]
+    if cipherQuery:
+        assert hash.GenHash(cipherQuery) == cipherQuery[3]
 
     return (cipherQuery, mapQuery)
 
-
-def SavePreset(cipher=None, map=None, path="presets.JSON", overwrite=True):
+def SavePreset(cipher=None, map=None, overwrite=True):
 
     if cipher:
         pass
@@ -124,11 +129,7 @@ def Validate(cipher=None, map=None, textLen=5000, keywordLen=25):
 
     # TODO: Check map/cipher combinations first
 
-    if map not in validMaps:
-        pass
-        #TODO: use difflib.ndiff to compare strings 
-
-
+    '''
     if cipher not in validCiphers:
         # Generate completely random unicode string
         plaintext = np.random.randint(0, 1114112, textLen, dtype=np.int32)
@@ -153,7 +154,8 @@ def Validate(cipher=None, map=None, textLen=5000, keywordLen=25):
 
         # Record cipher if it passes all tests
         validCiphers.append(cipher)
-
+    '''
+    
 init()
 
 print("Done. Somehow.")

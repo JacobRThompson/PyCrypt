@@ -1,13 +1,11 @@
 import ast
-from unit_tests import LogTest
-
 import numpy as np
 
 def evalSafety(cmd: str):
 
     temp = ast.parse(cmd, type_comments=True)
 
-    switch = WalkSwitch()
+    switch = EvalSafetySwitch()
     print(ast.dump(temp, indent=4))
     print("---------------------------------------")
 
@@ -25,12 +23,15 @@ def evalSafety(cmd: str):
         except:
             pass
     """
-class WalkSwitch:
+
+class EvalSafetySwitch:
 
     def __init__(self, whitelist=set(), aliases={}):
         self.whitelist = whitelist
         self.aliases = aliases
 
+        # Dict describing what functions to call for each datatype that can be
+        # passed to self.match() 
         self.cases = {ast.alias: self._alias, ast.Call: self._Call,
             ast.FunctionDef: self._FunctionDef, ast.Import: self._Import,
             ast.ImportFrom: self._ImportFrom, "default": self._default}
@@ -87,11 +88,7 @@ class WalkSwitch:
 
 string = '''
 np.sum(np.random.randn(5).T)
-'''
 
-
-
-'''
 def Test(x):
     return np.arange(x)
 
@@ -115,7 +112,8 @@ e=d
 '''
 
 
-evalSafety(string)
+#evalSafety(string)
+
 
 if __name__ == "__main__" and False:
-    from unit_tests import un_security
+    pass
