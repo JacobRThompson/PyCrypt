@@ -104,6 +104,8 @@ def LoadPreset(cipher=None, map=None) -> list:
     if cipherQuery:
         assert hash.GenHash(cipherQuery) == cipherQuery[3]
 
+    # TODO VALIDATE CIPHER FORMULA
+    
     return (cipherQuery, mapQuery)
 
 def SavePreset(cipher=None, map=None, overwrite=True):
