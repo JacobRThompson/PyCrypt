@@ -23,12 +23,14 @@ def evalSafety(cmd: str):
             pass
     """
 
+symbolTags = ("__func_name__","__var_name__")
+
 class SwitchHandler:
 
-    def __init__(self, whitelist=set(), blacklist=set(), aliases={}):
+    def __init__(self, whitelist=set(), blacklist=set(), symbols={}):
         self.blacklist = blacklist
         self.whitelist = whitelist
-        self.aliases = aliases
+        self.symbols = symbols
 
         # Dict describing what functions to call for each datatype that can be
         # passed to self.match() 
@@ -54,16 +56,45 @@ class SwitchHandler:
         origName = obj.name
         alias = obj.asname
 
-        self.AddAlias(origName, alias)
+        self.AddSymbol(origName, alias)
 
         print(f"{origName} aliased as {alias}")
 
     def _Assign(self, obj: ast.Assign):
         name = obj.targets[0].id
+        self.AddSymbol(name, "__var_name__")
+
         print(f"{name} was assigned")
 
     def _Attribute(self, obj: ast.Attribute):
-        moduleTree = GetAttributeModules(obj)
+
+        # get a breakdown of modules/submodule any called function is from.
+        currentNode = obj
+        moduleTree = []
+
+        while currentNode:
+            if type(currentNode) == ast.Attribute:
+                moduleTree.append(currentNode.attr)
+                currentNode = currentNode.value
+
+            # Triggers when we are at base module (ex. "numpy" in numpy.matlib.ones)   
+            elif type(currentNode) == ast.Name:
+
+                baseModule = currentNode.id
+                assert baseModule in self.symbols
+
+                # de-alias if necessary
+                if self.symbols[baseModule]:
+                    baseModule = self.symbols[baseModule]
+
+                moduleTree.append(baseModule)
+                currentNode = None
+            else:
+
+                print("\tnon-name, non-attribute :", end="")
+                currentNode = None
+
+        moduleTree.reverse()
         print(f"Attribute {'.'.join(moduleTree)} was accessed")
 
     def _Call(self, obj: ast.Call):
@@ -77,7 +108,7 @@ class SwitchHandler:
     
     def _FunctionDef(self, obj: ast.FunctionDef):
         funcName = obj.name
-        self.AddAlias(funcName)
+        self.AddSymbol(funcName, "__func_name__")
         # print(f"function {funcName} was defined")
         # add function to whitelist so the user can call that function
         # without raising exceptions
@@ -86,58 +117,42 @@ class SwitchHandler:
         importName = obj.names[-1].name
         importAlias = obj.names[-1].asname
 
-        self.AddAlias(importName, importAlias)
+        # THIS IS REDUNDANT!!!
+        # self.AddSymbol(importName, importAlias)
+
         # check if import is on the whitelist
-        print(f"{importName} imported as {importAlias}")
+        # print(f"{importName} imported as {importAlias}")
 
     def _ImportFrom(self, obj: ast.ImportFrom):
         baseModule = obj.module
         origName = obj.names[0].name
         alias = obj.names[0].asname
 
-        self.AddAlias(f"{baseModule}.{origName}", alias)
+        # self.AddSymbol(f"{baseModule}.{origName}", alias)
 
-        print(f"imported {origName} from {baseModule} as {alias}")
+        # print(f"imported {origName} from {baseModule} as {alias}")
         # check if import is on the whitelist
-
-    def AddAlias(self, origName, alias=None):
-
-        alias = str(alias) if alias else None
-        origName = str(origName)
-
-        if alias and origName in self.aliases:
-            self.aliases[origName].append(alias)
-        elif alias:
-            self.aliases[origName] = [alias]
-        else:
-            self.aliases[origName] = []
 
     def _default(self, obj):
         # print(obj)
         pass
+    
+    def AddSymbol(self, name, alias=None):
+        alias = str(alias) if alias else None
+        name = str(name)
 
-def GetAttributeModules(obj: ast.Attribute):
-
-    moduleTree = []
-
-    # get a breakdown of modules/submodule any called function is from.
-    currentNode = obj
-    while currentNode:
-        if type(currentNode) == ast.Attribute:
-            moduleTree.append(currentNode.attr)
-            currentNode = currentNode.value
-        elif type(currentNode) == ast.Name:
-            moduleTree.append(currentNode.id)
-            currentNode = None
+        if alias in symbolTags:
+            self.symbols[name] = alias
+        elif alias:
+            self.symbols[alias] = name
         else:
-            currentNode = None
+            self.symbols[name] = None
 
-    moduleTree.reverse()
-    return moduleTree
 
 string = '''
 import pandas
 import numpy as np
+import numpy as nump
 import os.path
 
 from numpy.matlib import ones
