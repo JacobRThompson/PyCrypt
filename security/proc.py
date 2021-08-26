@@ -23,7 +23,7 @@ def evalSafety(cmd: str):
             pass
     """
 
-symbolTags = ("__func_name__","__var_name__")
+symbolTags = ("__func_name__", "__var_name__")
 
 class SwitchHandler:
 
@@ -44,6 +44,7 @@ class SwitchHandler:
             ast.ImportFrom: self._ImportFrom,
             "default": self._default}
 
+
     def match(self, obj):
 
         t = type(obj)
@@ -56,15 +57,24 @@ class SwitchHandler:
         origName = obj.name
         alias = obj.asname
 
-        self.AddSymbol(origName, alias)
+        self.AddSymbols(origName, alias)
 
         print(f"{origName} aliased as {alias}")
 
     def _Assign(self, obj: ast.Assign):
-        name = obj.targets[0].id
-        self.AddSymbol(name, "__var_name__")
 
-        print(f"{name} was assigned")
+        for target in obj.targets:
+            if type(target) == ast.Name:
+                name = target.id
+                self.AddSymbols(name, "__var_name__")
+                print(f"{name} was assigned")
+
+            elif type(target in (ast.Tuple, ast.List)):
+                names = [item.id for item in target.elts]
+
+                self.AddSymbols(names, "__var_name__")
+                print(f"{', '.join(names)} were assigned")
+
 
     def _Attribute(self, obj: ast.Attribute):
 
@@ -99,16 +109,13 @@ class SwitchHandler:
 
     def _Call(self, obj: ast.Call):
 
-        #moduleTree = GetAttributeModules(obj.func)
-        #print(f"{'.'.join(moduleTree)} was called using {id(obj.func)}")
-
         # If the user attempts to call a function, we make sure that it is in
         # the list of approved funcs
         pass
     
     def _FunctionDef(self, obj: ast.FunctionDef):
         funcName = obj.name
-        self.AddSymbol(funcName, "__func_name__")
+        self.AddSymbols(funcName, "__func_name__")
         # print(f"function {funcName} was defined")
         # add function to whitelist so the user can call that function
         # without raising exceptions
@@ -118,7 +125,7 @@ class SwitchHandler:
         importAlias = obj.names[-1].asname
 
         # THIS IS REDUNDANT!!!
-        # self.AddSymbol(importName, importAlias)
+        # self.AddSymbols(importName, importAlias)
 
         # check if import is on the whitelist
         # print(f"{importName} imported as {importAlias}")
@@ -128,7 +135,7 @@ class SwitchHandler:
         origName = obj.names[0].name
         alias = obj.names[0].asname
 
-        # self.AddSymbol(f"{baseModule}.{origName}", alias)
+        # self.AddSymbols(f"{baseModule}.{origName}", alias)
 
         # print(f"imported {origName} from {baseModule} as {alias}")
         # check if import is on the whitelist
@@ -136,19 +143,22 @@ class SwitchHandler:
     def _default(self, obj):
         # print(obj)
         pass
-    
-    def AddSymbol(self, name, alias=None):
-        alias = str(alias) if alias else None
-        name = str(name)
 
-        if alias in symbolTags:
-            self.symbols[name] = alias
-        elif alias:
-            self.symbols[alias] = name
-        else:
-            self.symbols[name] = None
+    def AddSymbols(self, name, alias=None):
 
+        if type(name) == str:
+            alias = alias if alias else None
+            if alias in symbolTags:
+                self.symbols[name] = alias
+            elif alias:
+                self.symbols[alias] = name
+            else:
+                self.symbols[name] = None
 
+        elif type(name) in (list, tuple):
+            for i in name:
+                self.AddSymbols(i, alias)
+      
 string = '''
 import pandas
 import numpy as np
@@ -177,12 +187,11 @@ z.reverse()
 
 y=np.array([[1,2],[3,4]])
 
+Test(5)
 y+z
 
-z=a
-q=z
 
-test = 132
+g = Test(12)
 '''
 # TODO: WORK OUT WAY TO MAKE SURE Z.REVERSE() ISN'T SUSPECT
 
@@ -193,6 +202,5 @@ evalSafety(string)
 # -add blacklisted functions that raise a special exception
 # -keep track of lambda functions
 # -method for evaluating if function is whitelisted
-# deal with multiple assignment
 if __name__ == "__main__" and False:
     pass

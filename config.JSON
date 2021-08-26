@@ -5,8 +5,12 @@
 
     "security":{
         "useSecurityTests":true,
-        "trustedImports":[
-            "numpy"
+        "whiteList":[
+            "numpy",
+            "numpy.random"
+        ],
+        "blackList":[
+
         ]
 
     },
