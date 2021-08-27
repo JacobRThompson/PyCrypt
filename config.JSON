@@ -4,13 +4,13 @@
     },
 
     "security":{
-        "useSecurityTests":true,
-        "whiteList":[
+        "useSecurity":true,
+        "whitelist":[
             "numpy",
             "numpy.random"
         ],
-        "blackList":[
-
+        "blacklist":[
+            "numpy.load"
         ]
 
     },
