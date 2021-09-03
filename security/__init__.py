@@ -1,7 +1,11 @@
 import ast
 import json
+import time
+#TODO: ADD FUNCTIONALITY FOR CLASSES
 
-symbolTags = ("__func_name__", "__var_name__")
+symbolTags = (
+    "__func_name__", "__var_name__", "__class_instance__"
+)
 
 class ProcParser:
 
@@ -13,9 +17,14 @@ class ProcParser:
         self.useSecurity = settings["useSecurity"]
         self.whitelist = set(settings["whitelist"])
         self.blacklist = set(settings["blacklist"])
-        self.symbols = {}
 
+        self.symbols = {}
+        self._flaggedNodes = []
+        
     def match(self, obj):
+
+        #def IsChildBranch(subset,superset):
+        #   return all (subset[i] is superset[i] for i in range(len(subset)))
 
         objType = type(obj)
 
@@ -34,43 +43,56 @@ class ProcParser:
                     self.AddSymbols(name, "__var_name__")
                     print(f"{name} was assigned")
 
-                elif type(target in (ast.Tuple, ast.List)):
+                elif type(target) in (ast.Tuple, ast.List):
                     names = [item.id for item in target.elts]
-
                     self.AddSymbols(names, "__var_name__")
                     print(f"{', '.join(names)} were assigned")
 
+                elif type(target) == ast.Subscript:
+                    pass
+
         elif objType == ast.Attribute:
 
-            # get a breakdown of modules/submodule any called function is from.
-            currentNode = obj
-            moduleTree = []
+            nodeTree, searchTree = self.GenTree(obj)
 
-            while currentNode:
-                if type(currentNode) == ast.Attribute:
-                    moduleTree.append(currentNode.attr)
-                    currentNode = currentNode.value
+            if searchTree[-1] in symbolTags:
+                # We are calling a class method if this triggers. because python
+                # is not strongly typed, we cannot determine what class is
+                # calling this method. We assume it passes and that the user
+                # has checked and is wary of the module in which the calling
+                # class was defined
 
-                # Triggers when we are at base module (ex. "numpy" in numpy.matlib.ones)   
-                elif type(currentNode) == ast.Name:
+                print(f"Attribute {searchTree[0]} was accessed")
+                return
 
-                    baseModule = currentNode.id
-                    assert baseModule in self.symbols
+            doPassSecurity = False
 
-                    # de-alias if necessary
-                    if self.symbols[baseModule]:
-                        baseModule = self.symbols[baseModule]
+            for node, name in zip(nodeTree, searchTree):
 
-                    moduleTree.append(baseModule)
-                    currentNode = None
-                else:
-                    currentNode = None
-                    return
+                if name in self.whitelist:
+                    doPassSecurity = True
 
-            moduleTree.reverse()
+                elif name in self.blacklist and doPassSecurity:
+                    self._flaggedNodes.append(node)
 
-            self.VerifyAttribute(moduleTree)
-            print(f"Attribute {'.'.join(moduleTree)} was accessed")
+                elif name in self.blacklist:
+
+                    if any(node is flaggedNode for flaggedNode in self._flaggedNodes):
+                        doPassSecurity = True
+                    else:
+                        raise AttributeError(
+                            f"Invalid attribute '{searchTree[0]}'. '{name}' and "
+                            f"all of its children are currently blacklisted."
+                        )
+
+            if not doPassSecurity:
+                raise AttributeError(
+                    f"Invalid attribute '{searchTree[0]}'. It is not in the "
+                    f"current whitelist nor is it a child of any item on the "
+                    f"current whitelist."
+                )
+
+            print(f"Attribute {searchTree[0]} was accessed")
 
         elif objType == ast.Call:
             # Occurs when we are calling a locally-defined function
@@ -82,7 +104,7 @@ class ProcParser:
         elif objType == ast.FunctionDef:
             funcName = obj.name
             self.AddSymbols(funcName, "__func_name__")
-            # print(f"function {funcName} was defined")
+            print(f"function {funcName} was defined")
             # add function to whitelist so the user can call that function
             # without raising exceptions
 
@@ -94,7 +116,7 @@ class ProcParser:
             # self.AddSymbols(importName, importAlias)
 
             # check if import is on the whitelist
-            print(f"{importName} imported as {importAlias}")
+            # print(f"{importName} imported as {importAlias}")
 
         elif objType == ast.ImportFrom:
             baseModule = obj.module
@@ -103,12 +125,13 @@ class ProcParser:
 
             # self.AddSymbols(f"{baseModule}.{origName}", alias)
 
-            print(f"imported {origName} from {baseModule} as {alias}")
+            # print(f"imported {origName} from {baseModule} as {alias}")
             # check if import is on the whitelist
 
         else:
-            # print(obj)
+            #print(obj)
             pass
+            
 
     def AddSymbols(self, name, alias=None):
 
@@ -130,43 +153,69 @@ class ProcParser:
             for i in name:
                 self.AddSymbols(i, alias)
 
-    def VerifyAttribute(self, moduleTree: list):
+    def GenTree(self, obj) -> tuple[list, list]:
 
-        # This occurs if we are calling a user-defined attribute
-        if moduleTree[0] in symbolTags:
-            return
+        currentNode = obj
+        nodeTree = []
+        treeStrings = []
 
-        isWhitelist = False
+        while currentNode:
+            if type(currentNode) == ast.Attribute:
 
-        currentString = moduleTree[0]
-        assert currentString not in self.blacklist
-        isWhitelist = True if currentString in self.whitelist else isWhitelist
+                nodeTree.append(currentNode)
+                treeStrings.append(currentNode.attr)
+                currentNode = currentNode.value
 
-        # Iteratively go through modules in tree and check blacklist/whitelist
-        # status. If numpy isn't blacklisted, what about numpy.load etc.?
-        for substring in moduleTree[1:]:
-            currentString = ".".join((currentString,substring))
-            assert currentString not in self.blacklist
-            isWhitelist = True if currentString in self.whitelist else isWhitelist    
+            # Triggers when we are at base module (ex. "numpy" in numpy.matlib.ones) 
+            elif type(currentNode) == ast.Name:
+                nodeTree.append(currentNode)
+                treeStrings.append(self.DeAlias(currentNode.id))
+                currentNode = None
 
-        assert isWhitelist
+            # Triggers when we find a class obj calling a mehtod
+            elif type(currentNode) == ast.Call:
+                nodeTree.append(currentNode)
+                treeStrings.append("__class_instance__")
+                currentNode = None
+
+            else:
+                currentNode = None
+
+        treeStrings.reverse()
+        # create the search path used when evaluating blacklist and whitelist.
+        # We always start at called attritbute and work through its parent modules
+        # Ex: numpy.random.rand -> numpy.random -> numpy
+
+        searchTree = ['.'.join(treeStrings[:i]) for i in range(len(treeStrings), 0, -1)]
+
+        return nodeTree, searchTree
+
+    def DeAlias(self, alias):
+        if alias in self.symbols and self.symbols[alias]:
+            return self.symbols[alias]
+        else:
+            return alias
 
     def EvalSafety(self, cmd: str, *args):
         temp = ast.parse(cmd, *args)
+
+        #print(ast.dump(temp, indent =4))
         temp = ast.walk(temp)
         for i in temp:
             self.match(i)
+       
+
 
 print("-------------------------")
+
+
+# TODO: WORK OUT DICTS
+# importing submodule does not necessarily import parent
 
 string = '''
 import numpy as np
 import numpy as nump
-import os
-
-
 from numpy.matlib import ones
-
 
 def Test(x):
     return np.arange(x)
@@ -183,21 +232,22 @@ else:
 
 z=[1,2,3,4,5]
 z.reverse()
-
 y=np.array([[1,2],[3,4]])
-
 Test(5)
 y+z
-
 Test2(3)
-
 f = Test2(4)
 g = Test(12)
-'''
-# TODO: WORK OUT WAY TO MAKE SURE Z.REVERSE() ISN'T SUSPECT
 
-temp=ProcParser()
+a={1:"FOO",2:np.mat.mul(500)}
+a[3]="once"
+'''
+
+t=time.time()
+temp = ProcParser()
 temp.EvalSafety(string)
+
+print(f"Time taken: {time.time()-t}")
 
 if __name__ == "__main__" and False:
     pass

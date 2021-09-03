@@ -4,10 +4,11 @@
     },
 
     "security":{
-        "useSecurity":true,
+        "useSecurity":false,
         "whitelist":[
             "numpy",
-            "numpy.random"
+            "numpy.random",
+            "numpy.load.foo"
         ],
         "blacklist":[
             "numpy.load"
