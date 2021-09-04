@@ -1,8 +1,8 @@
 import ast
 import json
 import time
-#TODO: ADD FUNCTIONALITY FOR CLASSES
-
+# TODO: ADD FUNCTIONALITY FOR CLASSES
+# FIX NODE TRAVERSAL!!!
 symbolTags = (
     "__func_name__", "__var_name__", "__class_instance__"
 )
@@ -23,6 +23,8 @@ class ProcParser:
         
     def match(self, obj):
 
+        iterFields = list(ast.iter_fields(obj))
+        iterChild = list(ast.iter_child_nodes(obj))
         #def IsChildBranch(subset,superset):
         #   return all (subset[i] is superset[i] for i in range(len(subset)))
 
@@ -34,19 +36,19 @@ class ProcParser:
 
             self.AddSymbols(origName, alias)
 
-            print(f"{origName} aliased as {alias}")
+            # print(f"{origName} aliased as {alias}")
 
         elif objType == ast.Assign:
             for target in obj.targets:
                 if type(target) == ast.Name:
                     name = target.id
                     self.AddSymbols(name, "__var_name__")
-                    print(f"{name} was assigned")
+                    # print(f"{name} was assigned")
 
                 elif type(target) in (ast.Tuple, ast.List):
                     names = [item.id for item in target.elts]
                     self.AddSymbols(names, "__var_name__")
-                    print(f"{', '.join(names)} were assigned")
+                    # print(f"{', '.join(names)} were assigned")
 
                 elif type(target) == ast.Subscript:
                     pass
@@ -62,7 +64,7 @@ class ProcParser:
                 # has checked and is wary of the module in which the calling
                 # class was defined
 
-                print(f"Attribute {searchTree[0]} was accessed")
+                # print(f"Attribute {searchTree[0]} was accessed")
                 return
 
             doPassSecurity = False
@@ -92,13 +94,14 @@ class ProcParser:
                     f"current whitelist."
                 )
 
-            print(f"Attribute {searchTree[0]} was accessed")
+            # print(f"Attribute {searchTree[0]} was accessed")
 
         elif objType == ast.Call:
             # Occurs when we are calling a locally-defined function
             if type(obj.func) == ast.Name:
                 functionName = obj.func.id
-                print(f"{functionName} was called")
+                # print(f"{functionName} was called")
+                # maybe check if local function has __func_name__ tag?
                 assert functionName in self.symbols
 
         elif objType == ast.FunctionDef:
@@ -108,30 +111,25 @@ class ProcParser:
             # add function to whitelist so the user can call that function
             # without raising exceptions
 
-        elif objType == ast.Import:
-            importName = obj.names[-1].name
-            importAlias = obj.names[-1].asname
+        elif objType in (ast.Import, ast.ImportFrom):
 
-            # THIS IS REDUNDANT!!!
-            # self.AddSymbols(importName, importAlias)
+            if objType == ast.Import:
+                baseModule = None
+                importName = obj.names[-1].name
+                importAlias = obj.names[-1].asname
+            else:
+                baseModule = obj.module
+                importName = obj.names[0].name
+                importAlias = obj.names[0].asname
 
             # check if import is on the whitelist
-            # print(f"{importName} imported as {importAlias}")
-
-        elif objType == ast.ImportFrom:
-            baseModule = obj.module
-            origName = obj.names[0].name
-            alias = obj.names[0].asname
-
-            # self.AddSymbols(f"{baseModule}.{origName}", alias)
-
             # print(f"imported {origName} from {baseModule} as {alias}")
             # check if import is on the whitelist
 
         else:
             #print(obj)
-            pass
             
+            pass
 
     def AddSymbols(self, name, alias=None):
 
@@ -203,7 +201,6 @@ class ProcParser:
         temp = ast.walk(temp)
         for i in temp:
             self.match(i)
-       
 
 
 print("-------------------------")
@@ -216,20 +213,15 @@ string = '''
 import numpy as np
 import numpy as nump
 from numpy.matlib import ones
-
 def Test(x):
     return np.arange(x)
-
 Test2 = lambda x: np.random.randn(x)
-
 if 1>2:
     a = np.array([[1,2,3],[4,5,6],[7,8,9]])
     # assign B
     HELLO = np.sum(a,axis=0).T+5
-
 else:
     a = Test2(5)
-
 z=[1,2,3,4,5]
 z.reverse()
 y=np.array([[1,2],[3,4]])
@@ -238,16 +230,62 @@ y+z
 Test2(3)
 f = Test2(4)
 g = Test(12)
-
 a={1:"FOO",2:np.mat.mul(500)}
 a[3]="once"
 '''
 
-t=time.time()
 temp = ProcParser()
 temp.EvalSafety(string)
 
-print(f"Time taken: {time.time()-t}")
+if __name__ == "__main__" and True:
+    import unittest
 
-if __name__ == "__main__" and False:
-    pass
+    testWhitelist = {
+        "moduleA",
+        "moduleB.subModuleA",
+        "moduleB.subModuleB",
+        "moduleC.subModuleC.subSubModuleC"
+    }
+    testBlacklist = {
+        "moduleA.subModuleA",
+        "moduleB",
+        "moduleE"
+    }
+
+    def evalTestFile(path):
+        pp = ProcParser()
+        pp.whitelist = testWhitelist
+        pp.blacklist = testBlacklist
+        with open(path,'r') as infile:
+            cmd = infile.read()
+        pp.EvalSafety(cmd)
+
+    # TODO add import check.
+    # FIX moduleC.subModuleC.subSubModuleC so that moduleC.subModuleC is not
+    # flagged as invalid
+    class EvalSafetyUnitTest(unittest.TestCase):
+
+        def test_imports(self):
+            evalTestFile("security/unitTests/importsA.py")
+
+            self.assertRaises(ImportError,
+                evalTestFile, "security/unitTests/importsB.py"
+            )
+            self.assertRaises(ImportError,
+                evalTestFile, "security/unitTests/importsC.py"
+            )
+            self.assertRaises(ImportError,
+                evalTestFile, "security/unitTests/importsD.py"
+            )
+            self.assertRaises(ImportError,
+                evalTestFile,"security/unitTests/importsE.py"
+            )
+            self.assertRaises(ImportError,
+                evalTestFile, "security/unitTests/importsF.py"
+            )
+            self.assertRaises(ImportError,
+                evalTestFile, "security/unitTests/importsG.py"
+            )
+
+    unittest.main()
+

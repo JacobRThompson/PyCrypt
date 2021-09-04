@@ -14,12 +14,6 @@
             "numpy.load"
         ]
 
-    },
-
-    "unitTests":{
-        "doLog_global":true,
-        "UnValidate":{  "doRun":true,"doLog": true }
-        
     }
 
 }
