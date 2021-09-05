@@ -2,7 +2,7 @@ import ast
 import json
 import time
 # TODO: ADD FUNCTIONALITY FOR CLASSES
-# FIX NODE TRAVERSAL!!!
+# IMPORTS F DOES NOT FAIL!!!
 symbolTags = (
     "__func_name__", "__var_name__", "__class_instance__"
 )
@@ -19,26 +19,21 @@ class ProcParser:
         self.blacklist = set(settings["blacklist"])
 
         self.symbols = {}
-        self._flaggedNodes = []
-        
-    def match(self, obj):
-
-        iterFields = list(ast.iter_fields(obj))
-        iterChild = list(ast.iter_child_nodes(obj))
-        #def IsChildBranch(subset,superset):
-        #   return all (subset[i] is superset[i] for i in range(len(subset)))
+  
+    def Walk(self, obj):
 
         objType = type(obj)
 
         if objType == ast.alias:
+
             origName = obj.name
             alias = obj.asname
-
             self.AddSymbols(origName, alias)
-
             # print(f"{origName} aliased as {alias}")
 
+
         elif objType == ast.Assign:
+
             for target in obj.targets:
                 if type(target) == ast.Name:
                     name = target.id
@@ -53,83 +48,49 @@ class ProcParser:
                 elif type(target) == ast.Subscript:
                     pass
 
+
         elif objType == ast.Attribute:
+            # Shortcut to the end of attribute chain so we don't have to
+            # evaluate intermediate attributes multiple times
 
-            nodeTree, searchTree = self.GenTree(obj)
+            nodeTree, searchTree = self.CollectAttributeChain(obj)
+            self.EvalAttributeChain(searchTree)
+            obj = nodeTree[-1]
 
-            if searchTree[-1] in symbolTags:
-                # We are calling a class method if this triggers. because python
-                # is not strongly typed, we cannot determine what class is
-                # calling this method. We assume it passes and that the user
-                # has checked and is wary of the module in which the calling
-                # class was defined
-
-                # print(f"Attribute {searchTree[0]} was accessed")
-                return
-
-            doPassSecurity = False
-
-            for node, name in zip(nodeTree, searchTree):
-
-                if name in self.whitelist:
-                    doPassSecurity = True
-
-                elif name in self.blacklist and doPassSecurity:
-                    self._flaggedNodes.append(node)
-
-                elif name in self.blacklist:
-
-                    if any(node is flaggedNode for flaggedNode in self._flaggedNodes):
-                        doPassSecurity = True
-                    else:
-                        raise AttributeError(
-                            f"Invalid attribute '{searchTree[0]}'. '{name}' and "
-                            f"all of its children are currently blacklisted."
-                        )
-
-            if not doPassSecurity:
-                raise AttributeError(
-                    f"Invalid attribute '{searchTree[0]}'. It is not in the "
-                    f"current whitelist nor is it a child of any item on the "
-                    f"current whitelist."
-                )
-
-            # print(f"Attribute {searchTree[0]} was accessed")
 
         elif objType == ast.Call:
             # Occurs when we are calling a locally-defined function
             if type(obj.func) == ast.Name:
                 functionName = obj.func.id
-                # print(f"{functionName} was called")
+                # # print(f"{functionName} was called")
                 # maybe check if local function has __func_name__ tag?
                 assert functionName in self.symbols
+
 
         elif objType == ast.FunctionDef:
             funcName = obj.name
             self.AddSymbols(funcName, "__func_name__")
-            print(f"function {funcName} was defined")
-            # add function to whitelist so the user can call that function
-            # without raising exceptions
+            # print(f"function {funcName} was defined")
+
 
         elif objType in (ast.Import, ast.ImportFrom):
 
             if objType == ast.Import:
-                baseModule = None
                 importName = obj.names[-1].name
-                importAlias = obj.names[-1].asname
+                # importAlias = obj.names[-1].asname
             else:
-                baseModule = obj.module
-                importName = obj.names[0].name
-                importAlias = obj.names[0].asname
+                importName = ".".join((obj.module, obj.names[0].name))
+                # importAlias = obj.names[0].asname
 
-            # check if import is on the whitelist
-            # print(f"imported {origName} from {baseModule} as {alias}")
-            # check if import is on the whitelist
+            treeStrings = importName.split(".")
+            searchTree = ['.'.join(treeStrings[:i]) for i in range(len(treeStrings), 0, -1)]
 
-        else:
-            #print(obj)
-            
-            pass
+            self.EvalAttributeChain(searchTree, errorType=ImportError)
+
+
+        for child in ast.iter_child_nodes(obj):
+            self.Walk(child)
+
 
     def AddSymbols(self, name, alias=None):
 
@@ -151,7 +112,38 @@ class ProcParser:
             for i in name:
                 self.AddSymbols(i, alias)
 
-    def GenTree(self, obj) -> tuple[list, list]:
+    def EvalAttributeChain(self, searchTree, errorType=AttributeError):
+        
+        # We are calling a class method if this fails to triggers. because
+        # python is not strongly typed, we cannot determine what class is
+        # calling this method. We assume it passes and that the user has
+        # checked and is wary of the module in which the calling class was
+        # defined
+        if searchTree[-1] not in symbolTags:
+
+            doFailSecurity = True
+
+            for name in searchTree:
+
+                if name in self.whitelist:
+                    doFailSecurity = False
+
+                elif name in self.blacklist and doFailSecurity:
+                    raise errorType(
+                        f"Invalid attribute '{searchTree[0]}'. '{name}' and "
+                        f"all of its children are currently blacklisted."
+                    )
+                
+            if doFailSecurity:
+                raise errorType(
+                    f"Invalid attribute '{searchTree[0]}'. It is not in the "
+                    f"current whitelist nor is it a child of any item on the "
+                    f"current whitelist."
+                )
+        # print(f"Attribute {searchTree[0]} was accessed")
+        
+
+    def CollectAttributeChain(self, obj) -> tuple[list, list]:
 
         currentNode = obj
         nodeTree = []
@@ -194,16 +186,13 @@ class ProcParser:
         else:
             return alias
 
+    
     def EvalSafety(self, cmd: str, *args):
         temp = ast.parse(cmd, *args)
 
-        #print(ast.dump(temp, indent =4))
-        temp = ast.walk(temp)
-        for i in temp:
-            self.match(i)
+        self.Walk(temp)
 
-
-print("-------------------------")
+# print("-------------------------")
 
 
 # TODO: WORK OUT DICTS
@@ -260,9 +249,6 @@ if __name__ == "__main__" and True:
             cmd = infile.read()
         pp.EvalSafety(cmd)
 
-    # TODO add import check.
-    # FIX moduleC.subModuleC.subSubModuleC so that moduleC.subModuleC is not
-    # flagged as invalid
     class EvalSafetyUnitTest(unittest.TestCase):
 
         def test_imports(self):
