@@ -3,11 +3,12 @@ import json
 import pg8000
 import numpy as np
 
-from security import hash
+import security
 
-# validCiphers, validMaps = [], []
+tempCiphers, tempMaps = {}, {}
 con: pg8000.Connection = None
 
+#TODO: TRANSFORM QUERIES FROM LIST TO DICT
 
 def init() -> pg8000.Connection:
 
@@ -69,7 +70,6 @@ def init() -> pg8000.Connection:
 
     return con
 
-
 def LoadPreset(cipher=None, map=None) -> list:
     assert cipher is None or type(cipher) == str
     assert map is None or type(map) == str
@@ -98,13 +98,17 @@ def LoadPreset(cipher=None, map=None) -> list:
     else:
         cipherQuery = None
 
-    # Validate hashes of retrieved cipher and/or map
     if mapQuery:
-        assert hash.GenHash(mapQuery) == mapQuery[2]
+        # Validate hash
+        assert security.GenHash(mapQuery) == mapQuery[2]
+        
     if cipherQuery:
-        assert hash.GenHash(cipherQuery) == cipherQuery[3]
+        # Validate hash
+        assert security.GenHash(cipherQuery) == cipherQuery[3]
 
-    # TODO VALIDATE CIPHER FORMULA
+        # Make sure that cipher formula and inverse isn't malicious
+        security.EvalSafety(cipherQuery[5])
+        security.EvalSafety(cipherQuery[6])
     
     return (cipherQuery, mapQuery)
 
@@ -118,46 +122,15 @@ def SavePreset(cipher=None, map=None, overwrite=True):
 
     pass
 
+def SaveTemp():
+    pass
 
-def Validate(cipher=None, map=None, textLen=5000, keywordLen=25):
+def LoadTemp():
+    pass
 
-    def EvalCommand(command, text, keywords):
-        """ Evaluates passed cipher/map command in a scope where it can
-        manipulate variable without breaking the calling function"""
 
-        #NOTE: THIS IS EXTREMELY UNSAFE!!! DON'T BE AN IDIOT ABOUT IT
-        #WE CAN FIX THIS BY PARSING STRING INTO OBJECTS (ast module will help)
-        return exec(command)
-
-    # TODO: Check map/cipher combinations first
-
-    '''
-    if cipher not in validCiphers:
-        # Generate completely random unicode string
-        plaintext = np.random.randint(0, 1114112, textLen, dtype=np.int32)
-
-        # Generate minimum number of keywords to use cipher
-        keywords = [np.random.randint(0, 1114112, keywordLen, dtype=np.int32)
-                    for i in range(cipher["noKeywords"])]
-
-        # Create and format copies of the generated plaintext and keywords that
-        # the cipher can play with without breaking everything
-
-        encryptedText = EvalCommand(cipher["cipher_formula"], plaintext,
-                                    keywords)
-
-        decryptedText = EvalCommand(cipher["cipher_inverse"], plaintext,
-                                    keywords)
-
-        # If data is lost/changed, raise exception.
-        # TODO: if map passed validation, Try again using mapping/demapping
-        # this time. If it  
-        assert np.array_equal(plaintext, decryptedText)
-
-        # Record cipher if it passes all tests
-        validCiphers.append(cipher)
-    '''
     
+
 init()
 
 print("Done. Somehow.")

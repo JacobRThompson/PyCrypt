@@ -8,17 +8,14 @@ BEGIN
 	THEN
         CREATE TABLE maps(
             map_id      INT GENERATED ALWAYS AS IDENTITY,
-            
-            map_name        TEXT,
             map_hash        TEXT,
-
+            map_name        TEXT,
+            
             map_keywords    TEXT[],
 
             map_transform   JSON NOT NULL,
             map_inverse     JSON NOT NULL,
-            map_domain      INTEGER[],
-            map_range       INTEGER[],
-            map_equalities  INTEGER[],
+            map_equalities  JSON,
 			
 			PRIMARY KEY (map_id)
         );
@@ -35,16 +32,15 @@ BEGIN
 	THEN
         CREATE TABLE ciphers(
             cipher_id       INT GENERATED ALWAYS AS IDENTITY,
+            cipher_hash     TEXT,
+            cipher_name     TEXT,
+            
             map_id          INT,
 
-            cipher_name     TEXT,
-            cipher_hash     TEXT,
-            
             cipher_keywords TEXT[],
 
             cipher_formula  TEXT NOT NULL,    
             cipher_inverse  TEXT,  
-
             
 			PRIMARY KEY (cipher_id),
             CONSTRAINT cipher_map

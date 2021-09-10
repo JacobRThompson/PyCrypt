@@ -1,14 +1,18 @@
 import ast
+import getpass
 import json
-import time
+import hashlib
+import os
+import pickle
+
 # TODO: ADD FUNCTIONALITY FOR CLASSES
-# IMPORTS F DOES NOT FAIL!!!
-symbolTags = (
-    "__func_name__", "__var_name__", "__class_instance__"
-)
+# ADD FUNCTIONALITY FOR "USESECURITY" SETTING
+# WORK OUT DICTS
+# WORK OUT CLASSES
+saltSeed = getpass.getuser()
+
 
 class ProcParser:
-
     def __init__(self):
 
         with open("config.JSON", 'r') as config:
@@ -19,11 +23,14 @@ class ProcParser:
         self.blacklist = set(settings["blacklist"])
 
         self.symbols = {}
-  
+
+    symbolTags = (
+        "__func_name__", "__var_name__", "__class_instance__"
+    )
+
     def Walk(self, obj):
 
         objType = type(obj)
-
         if objType == ast.alias:
 
             origName = obj.name
@@ -31,23 +38,19 @@ class ProcParser:
             self.AddSymbols(origName, alias)
             # print(f"{origName} aliased as {alias}")
 
-
         elif objType == ast.Assign:
 
             for target in obj.targets:
                 if type(target) == ast.Name:
                     name = target.id
                     self.AddSymbols(name, "__var_name__")
-                    # print(f"{name} was assigned")
 
                 elif type(target) in (ast.Tuple, ast.List):
                     names = [item.id for item in target.elts]
                     self.AddSymbols(names, "__var_name__")
-                    # print(f"{', '.join(names)} were assigned")
-
+                    
                 elif type(target) == ast.Subscript:
                     pass
-
 
         elif objType == ast.Attribute:
             # Shortcut to the end of attribute chain so we don't have to
@@ -57,7 +60,6 @@ class ProcParser:
             self.EvalAttributeChain(searchTree)
             obj = nodeTree[-1]
 
-
         elif objType == ast.Call:
             # Occurs when we are calling a locally-defined function
             if type(obj.func) == ast.Name:
@@ -66,42 +68,38 @@ class ProcParser:
                 # maybe check if local function has __func_name__ tag?
                 assert functionName in self.symbols
 
-
         elif objType == ast.FunctionDef:
             funcName = obj.name
             self.AddSymbols(funcName, "__func_name__")
             # print(f"function {funcName} was defined")
 
-
         elif objType in (ast.Import, ast.ImportFrom):
 
+            # Pull out the name of each module being imported
             if objType == ast.Import:
-                importName = obj.names[-1].name
-                # importAlias = obj.names[-1].asname
+                importList = [aliasObj.name for aliasObj in obj.names]
             else:
-                importName = ".".join((obj.module, obj.names[0].name))
-                # importAlias = obj.names[0].asname
+                importList = [".".join((obj.module, aliasObj.name)) for aliasObj in obj.names]
 
-            treeStrings = importName.split(".")
-            searchTree = ['.'.join(treeStrings[:i]) for i in range(len(treeStrings), 0, -1)]
+            for item in importList:
+                treeStrings = item.split(".")
+                searchTree = ['.'.join(treeStrings[:i]) for i in range(len(treeStrings), 0, -1)]
 
-            self.EvalAttributeChain(searchTree, errorType=ImportError)
-
+                self.EvalAttributeChain(searchTree, errorType=ImportError)
 
         for child in ast.iter_child_nodes(obj):
             self.Walk(child)
-
 
     def AddSymbols(self, name, alias=None):
 
         if type(name) == str:
 
-            assert name not in symbolTags, (
+            assert name not in ProcParser.symbolTags, (
                 f"{name} as a string is used internally by ProcParser. Parsed "
                 "Functions, variables, etc. cannot use this name.")
 
             alias = alias if alias else None
-            if alias in symbolTags:
+            if alias in ProcParser.symbolTags:
                 self.symbols[name] = alias
             elif alias:
                 self.symbols[alias] = name
@@ -113,13 +111,13 @@ class ProcParser:
                 self.AddSymbols(i, alias)
 
     def EvalAttributeChain(self, searchTree, errorType=AttributeError):
-        
+
         # We are calling a class method if this fails to triggers. because
         # python is not strongly typed, we cannot determine what class is
         # calling this method. We assume it passes and that the user has
         # checked and is wary of the module in which the calling class was
         # defined
-        if searchTree[-1] not in symbolTags:
+        if searchTree[-1] not in ProcParser.symbolTags:
 
             doFailSecurity = True
 
@@ -133,7 +131,7 @@ class ProcParser:
                         f"Invalid attribute '{searchTree[0]}'. '{name}' and "
                         f"all of its children are currently blacklisted."
                     )
-                
+
             if doFailSecurity:
                 raise errorType(
                     f"Invalid attribute '{searchTree[0]}'. It is not in the "
@@ -141,7 +139,6 @@ class ProcParser:
                     f"current whitelist."
                 )
         # print(f"Attribute {searchTree[0]} was accessed")
-        
 
     def CollectAttributeChain(self, obj) -> tuple[list, list]:
 
@@ -192,39 +189,22 @@ class ProcParser:
 
         self.Walk(temp)
 
-# print("-------------------------")
+def EvalSafety(string):
+    temp = ProcParser()
+    temp.EvalSafety(string)
+
+def GenHash(query: list):
+    """Generates a hash based on a mapQuery or a cipherQuery"""
 
 
-# TODO: WORK OUT DICTS
-# importing submodule does not necessarily import parent
+    # get location of hash entry in query; then replace it w/ a constant
+    query[1] = saltSeed
 
-string = '''
-import numpy as np
-import numpy as nump
-from numpy.matlib import ones
-def Test(x):
-    return np.arange(x)
-Test2 = lambda x: np.random.randn(x)
-if 1>2:
-    a = np.array([[1,2,3],[4,5,6],[7,8,9]])
-    # assign B
-    HELLO = np.sum(a,axis=0).T+5
-else:
-    a = Test2(5)
-z=[1,2,3,4,5]
-z.reverse()
-y=np.array([[1,2],[3,4]])
-Test(5)
-y+z
-Test2(3)
-f = Test2(4)
-g = Test(12)
-a={1:"FOO",2:np.mat.mul(500)}
-a[3]="once"
-'''
+    p = pickle.dumps(query)
+    salt = os.urandom(hashlib.blake2b.SALT_SIZE)
+    h = hashlib.blake2b(p, salt=salt)
 
-temp = ProcParser()
-temp.EvalSafety(string)
+    return(h.digest())
 
 if __name__ == "__main__" and True:
     import unittest

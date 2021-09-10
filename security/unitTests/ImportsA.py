@@ -15,3 +15,6 @@ from moduleB import subModuleB, subModuleA
 
 # Does the last test work when we alias?
 from moduleB import subModuleA as subA, subModuleB as subB
+
+# Can we import a submodule if only the parent module is on the whitelist?
+from moduleA import subModuleC

@@ -3,63 +3,105 @@
 __version__ = "1.0"
 __author__ = "Jacob Thompson"
 
+#USER MUST BE USING LATER THAN PYTHON 3.7 FOR ORDERED DICTS
+
 import numpy as np
-import utils
-import sqlite3
+from numpy.core.numeric import indices
+import security
 
-def InverseTrans(transform: np.ndarray) -> np.ndarray:
-    inv = np.zeros(transform.max()+1)
-    return np.put(inv, transform, np.arange(len(transform)))
+import time
 
-
-def Encode(plaintext: str, map: dict = None) -> np.ndarray:
-    """ Converts passed string to int array; transform output one is given."""
-
-    arr_unmapped = np.frombuffer(plaintext.encode("utf32"), dtype=np.int32)
-    if map:
-        # remove elements that are outside of map's domain
-        arr_inDomain = np.in1d(arr_unmapped, map["domain"])
-        temp = arr_unmapped[arr_inDomain]
-
-        # Apply mapping. Also return any data needed to restore text
-        return map["transform"][temp], arr_unmapped, arr_inDomain
-
-    else:
-        return arr_unmapped
+emptyTransform = np.full(1114112, -1, dtype=np.int64)
 
 
-def Decode(unmapped: np.ndarray, map: dict = None) -> str:
+def Encode(plaintext: str) -> np.ndarray:
+    """ Converts passed string to int array"""
+    return np.frombuffer(plaintext.encode("utf32"), dtype=np.int32)[1:]
 
-    # Apply inverse mapping if map is given
-    temp = map["inverse"][unmapped] if map else unmapped
-    return temp.tobytes().decode("utf32")
+def Decode(numRepr: np.ndarray) -> str:
+    return numRepr.tobytes().decode("utf32")
 
+def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray):
 
-def Restore(unmapped: np.ndarray, original: np.ndarray,
-            inDomain: np.ndarray, map: dict) -> str:
+    out = np.copy(numRepr)
+    values = transform[numRepr]
+    indices = np.flatnonzero(values >= 0)
 
-    # Preform inverse mapping
-    arr_encoded = map["inverse"][unmapped]
+    np.put(out, indices, values[indices])
+    return out, indices
 
-    temp = np.copy(original)
+def CompressTransform(transform: np.ndarray) -> dict[str, int]:
 
-    # Reassign values that were intially within the map's domain
-    temp[inDomain] = arr_encoded
+    indices = np.flatnonzero(transform >= 0)
+    values = transform[indices]
+    keys = Decode(indices)[::2]     #I Have no idea why \x00 gets added. Nonetheless we filter them out
+    return {key: value for key, value in zip(keys, values)}
 
-    return temp.tobytes().decode("utf32")
+def DecompressTransform(transform: dict[str, int]):
+    out = np.copy(emptyTransform)
 
+    domain = Encode("".join(transform.keys()))
+    range = tuple(transform.values())
 
-def Encrypt(plaintext: str, cipher=None, map=None, *keywords,
-            usePresets: bool = True):
+    np.put(out, domain, range)
+    return out, range
 
-    if usePresets and str in (type(cipher), type(map)):
+def DecompressEqualities(equality: dict[str, str]):
+    out = np.copy(emptyTransform)
 
-        cipher, map = utils.LoadPreset(cipher, map)
-    
-    utils.Validate(cipher, map)
+    domain = Encode("".join(equality.keys()))
+    range = Encode("".join(equality.values()))
 
-    return exec(formula)
+    np.put(out, domain, range)
+    return out
+
+def GenInverseTransform(transform: np.ndarray) -> np.ndarray:
+
+    out = np.copy(emptyTransform)
+    range = np.flatnonzero(transform >= 0)
+    domain = transform[range]
+
+    np.put(out, domain, range)
+    return out
+
+def GenPlaintext(length=5000):
+    return np.random.randint(0, 1114112, length, dtype=np.int32)
+
+def GenKeywords(n, length=25):
+    return [np.random.randint(0, 1114112, length, dtype=np.int32) for i in range(n)]
 
 if __name__ == '__main__' and True:
-    import unit_tests
-    unit_tests.Run("encrypt")
+
+    t = {
+        "A":0,  "b":1,  "C":2,  "d":99,  "E":4,  "f":5,  "G":6,  "h":7,  "I":8,  "j":9,
+        "K":10, "l":11, "M":12, "n":13, "O":14, "p":15, "Q":16, "r":17, "S":18, "t":19,
+        "U":20, "v":21, "V":22, "w":23, "X":24, "y":25, "Z":26}
+
+    e = {
+        "B":"b", "D":"d", "F":"f", "H":"h", "J":"j",
+        "L":"l", "N":"n", "P":"p", "R":"r", "T":"t",
+        "V":"v", "W":"w", "Y":"y"
+    }
+
+
+    p = "ABCDEFGHIJKLMNOPQRSTUVWXYZ!\t!THE QUICK BROWN DOG JUMPED OVER THE LAZY FOX!\t!abcdefghijklmnopqrstuvwxyz"
+
+    #t0 = time.time()
+    transform, range = DecompressTransform(t)
+    t2 = CompressTransform(transform)
+
+    equalities = DecompressEqualities(e)
+
+    plaintext = Encode(p)
+
+    inverse = GenInverseTransform(transform)
+
+    plaintext = ApplyTransform(plaintext, equalities)[0]
+    plaintext = ApplyTransform(plaintext, transform)[0]
+    plaintext = ApplyTransform(plaintext, inverse)[0]
+
+    temp = Decode(plaintext)
+
+    #print(time.time()-t0)
+    print(temp)
+
