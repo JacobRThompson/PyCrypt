@@ -18,17 +18,10 @@ def Encode(plaintext: str) -> np.ndarray:
     """ Converts passed string to int array"""
     return np.frombuffer(plaintext.encode("utf32"), dtype=np.int32)[1:]
 
+
 def Decode(numRepr: np.ndarray) -> str:
     return numRepr.tobytes().decode("utf32")
 
-def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray):
-
-    out = np.copy(numRepr)
-    values = transform[numRepr]
-    indices = np.flatnonzero(values >= 0)
-
-    np.put(out, indices, values[indices])
-    return out, indices
 
 def CompressTransform(transform: np.ndarray) -> dict[str, int]:
 
@@ -37,6 +30,7 @@ def CompressTransform(transform: np.ndarray) -> dict[str, int]:
     keys = Decode(indices)[::2]     #I Have no idea why \x00 gets added. Nonetheless we filter them out
     return {key: value for key, value in zip(keys, values)}
 
+
 def DecompressTransform(transform: dict[str, int]):
     out = np.copy(emptyTransform)
 
@@ -44,7 +38,8 @@ def DecompressTransform(transform: dict[str, int]):
     range = tuple(transform.values())
 
     np.put(out, domain, range)
-    return out, range
+    return out
+
 
 def DecompressEqualities(equality: dict[str, str]):
     out = np.copy(emptyTransform)
@@ -55,6 +50,7 @@ def DecompressEqualities(equality: dict[str, str]):
     np.put(out, domain, range)
     return out
 
+
 def GenInverseTransform(transform: np.ndarray) -> np.ndarray:
 
     out = np.copy(emptyTransform)
@@ -64,11 +60,20 @@ def GenInverseTransform(transform: np.ndarray) -> np.ndarray:
     np.put(out, domain, range)
     return out
 
-def GenPlaintext(length=5000):
-    return np.random.randint(0, 1114112, length, dtype=np.int32)
 
-def GenKeywords(n, length=25):
-    return [np.random.randint(0, 1114112, length, dtype=np.int32) for i in range(n)]
+def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray, maskedIndices=None):
+
+    values = transform[numRepr]
+
+    if maskedIndices is None:
+        indices = np.flatnonzero(values == -1)
+    else:
+        indices = np.union1d(maskedIndices, np.flatnonzero(values == -1))
+
+    np.put(values, indices, numRepr[indices])
+
+    return values, indices
+
 
 if __name__ == '__main__' and True:
 
@@ -87,7 +92,7 @@ if __name__ == '__main__' and True:
     p = "ABCDEFGHIJKLMNOPQRSTUVWXYZ!\t!THE QUICK BROWN DOG JUMPED OVER THE LAZY FOX!\t!abcdefghijklmnopqrstuvwxyz"
 
     #t0 = time.time()
-    transform, range = DecompressTransform(t)
+    transform = DecompressTransform(t)
     t2 = CompressTransform(transform)
 
     equalities = DecompressEqualities(e)
@@ -97,11 +102,17 @@ if __name__ == '__main__' and True:
     inverse = GenInverseTransform(transform)
 
     plaintext = ApplyTransform(plaintext, equalities)[0]
-    plaintext = ApplyTransform(plaintext, transform)[0]
-    plaintext = ApplyTransform(plaintext, inverse)[0]
+    plaintext, mask = ApplyTransform(plaintext, transform)
+    plaintext = ApplyTransform(plaintext, inverse, mask)[0]
 
     temp = Decode(plaintext)
 
     #print(time.time()-t0)
     print(temp)
 
+
+def GenPlaintext(length=5000):
+    return np.random.randint(0, 1114112, length, dtype=np.int32)
+
+def GenKeywords(n, length=25):
+    return [np.random.randint(0, 1114112, length, dtype=np.int32) for i in range(n)]
