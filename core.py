@@ -3,6 +3,7 @@
 __version__ = "1.0"
 __author__ = "Jacob Thompson"
 
+# TODO: DISTINGUISH BETWEEN TEXT AND NONTEXT KEYS; APPLY MAP TO STRING KEYS
 #USER MUST BE USING LATER THAN PYTHON 3.7 FOR ORDERED DICTS
 
 import numpy as np
@@ -12,7 +13,6 @@ import security
 import time
 
 emptyTransform = np.full(1114112, -1, dtype=np.int64)
-
 
 def Encode(plaintext: str) -> np.ndarray:
     """ Converts passed string to int array"""
@@ -38,17 +38,7 @@ def DecompressTransform(transform: dict[str, int]):
     range = tuple(transform.values())
 
     np.put(out, domain, range)
-    return out
-
-
-def DecompressEqualities(equality: dict[str, str]):
-    out = np.copy(emptyTransform)
-
-    domain = Encode("".join(equality.keys()))
-    range = Encode("".join(equality.values()))
-
-    np.put(out, domain, range)
-    return out
+    return out, set(domain), set(range)
 
 
 def GenInverseTransform(transform: np.ndarray) -> np.ndarray:
@@ -59,6 +49,10 @@ def GenInverseTransform(transform: np.ndarray) -> np.ndarray:
 
     np.put(out, domain, range)
     return out
+
+
+def GenInverseMask(x, mask):
+    return np.delete(np.arange(x.shape[0]), mask)
 
 
 def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray, maskedIndices=None):
@@ -75,44 +69,64 @@ def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray, maskedIndices=Non
     return values, indices
 
 
+def PreprocessKeys(transform, *keys):
+    keysOut = []
+
+    # NOTE: WE CAN ENCODE IN ALL KEYS IN ONE STEP IF PERFORMANCE BECOMES BAD
+    for key in keys:
+        if type(key) != str:
+            keysOut.append(key)
+
+        else:
+            k, m = ApplyTransform(Encode(key), transform)
+            keysOut.append(np.delete(k, m))
+
+        return keysOut
+
+def ApplyFormula(formula, text, keys, mapRange, mappedIndices, options,
+    pp=security.ProcParser("text", "keys", "mapRange", "mappedIndices", "options")):
+
+    formula = "".join(("import numpy as np\n", formula))
+    pp.EvalSafety(formula)
+
+    _localsVars = {}
+    exec(formula, {}, _localsVars)
+
+    return _localsVars['out']
+
+
+
 if __name__ == '__main__' and True:
 
     t = {
-        "A":0,  "b":1,  "C":2,  "d":99,  "E":4,  "f":5,  "G":6,  "h":7,  "I":8,  "j":9,
-        "K":10, "l":11, "M":12, "n":13, "O":14, "p":15, "Q":16, "r":17, "S":18, "t":19,
-        "U":20, "v":21, "V":22, "w":23, "X":24, "y":25, "Z":26}
-
-    e = {
-        "B":"b", "D":"d", "F":"f", "H":"h", "J":"j",
-        "L":"l", "N":"n", "P":"p", "R":"r", "T":"t",
-        "V":"v", "W":"w", "Y":"y"
-    }
+        "A":0,  "a":0,  "B":1,  "b":1,  "C":2,  "c":2,  "D":3,  "d":3,  "E":4,  "e":4,
+        "F":5,  "f":5,  "G":6,  "g":6,  "H":7,  "h":7,  "I":8,  "i":8,  "J":9,  "j":9,
+        "K":10, "k":10, "L":11, "l":11, "M":12, "m":12, "N":13, "n":13, "O":14, "o":14,
+        "P":15, "p":15, "Q":16, "q":16, "R":17, "r":17, "S":18, "s":18, "T":19, "t":19,
+        "U":20, "u":20, "V":21, "v":21, "W":22, "w":22, "X":23, "x":23, "Y":24, "y":24,
+        "Z":25, "z":25}
 
 
-    p = "ABCDEFGHIJKLMNOPQRSTUVWXYZ!\t!THE QUICK BROWN DOG JUMPED OVER THE LAZY FOX!\t!abcdefghijklmnopqrstuvwxyz"
+    p = "ABCDEFGHIJKLMNOPQRSTUVWXYZ!\t!ThE qUiCk BrOwN dOg JuMpEd OvEr ThE LaZy FoX!\t!abcdefghijklmnopqrstuvwxyz"
 
-    #t0 = time.time()
-    transform = DecompressTransform(t)
-    t2 = CompressTransform(transform)
-
-    equalities = DecompressEqualities(e)
+    transform = DecompressTransform(t)[0]
+    tCheck = CompressTransform(transform)
 
     plaintext = Encode(p)
 
     inverse = GenInverseTransform(transform)
 
-    plaintext = ApplyTransform(plaintext, equalities)[0]
     plaintext, mask = ApplyTransform(plaintext, transform)
     plaintext = ApplyTransform(plaintext, inverse, mask)[0]
 
     temp = Decode(plaintext)
 
-    #print(time.time()-t0)
     print(temp)
-
+    
 
 def GenPlaintext(length=5000):
     return np.random.randint(0, 1114112, length, dtype=np.int32)
 
 def GenKeywords(n, length=25):
     return [np.random.randint(0, 1114112, length, dtype=np.int32) for i in range(n)]
+

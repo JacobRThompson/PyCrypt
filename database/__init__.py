@@ -8,8 +8,6 @@ import security
 tempCiphers, tempMaps = {}, {}
 con: pg8000.Connection = None
 
-#TODO: TRANSFORM QUERIES FROM LIST TO DICT
-
 def init() -> pg8000.Connection:
 
     global con
@@ -70,7 +68,7 @@ def init() -> pg8000.Connection:
 
     return con
 
-def LoadPreset(cipher=None, map=None) -> list:
+def LoadSavedata(cipher=None, map=None) -> list:
     assert cipher is None or type(cipher) == str
     assert map is None or type(map) == str
     assert con  # Make sure that we initalized module
@@ -84,49 +82,37 @@ def LoadPreset(cipher=None, map=None) -> list:
     if cipher:
         cipherQuery = con.run(f"SELECT * FROM ciphers WHERE cipher_name={cipher}")[0]
         assert cipherQuery is not None
-
-        # If cipher has a listed map dependency...
-        if cipherQuery[1] is not None:
-            # and if the user passed a map query...
-            if mapQuery:
-                # we make sure the passed query and cipher dependency are one
-                # and the same
-                assert cipherQuery[1] == mapQuery[0]
-            else:
-                # otherwise we look up the listed dependency
-                mapQuery = con.run(f"SELECT * FROM maps WHERE map_id = {cipherQuery[1]}")[0]
     else:
         cipherQuery = None
 
     if mapQuery:
         # Validate hash
-        assert security.GenHash(mapQuery) == mapQuery[2]
-        
+        assert security.GenHash(mapQuery[2:]) == mapQuery[1]
+
     if cipherQuery:
         # Validate hash
-        assert security.GenHash(cipherQuery) == cipherQuery[3]
+        assert security.GenHash(cipherQuery[2:]) == cipherQuery[1]
 
         # Make sure that cipher formula and inverse isn't malicious
-        security.EvalSafety(cipherQuery[5])
-        security.EvalSafety(cipherQuery[6])
-    
+        security.EvalSafety(cipherQuery[3])
+        security.EvalSafety(cipherQuery[4])
+
     return (cipherQuery, mapQuery)
 
-def SavePreset(cipher=None, map=None, overwrite=True):
 
-    if cipher:
-        pass
+def SaveCipher(name, formula, inverse, keywords, options):
 
-    if map:
-        pass
+    hash_ = security.GenHash([name, formula, inverse, keywords, options])
+    queryArgs = (hash_, name, formula, inverse, keywords, options)
+    con.run(f"INSERT INTO ciphers VALUES {queryArgs}")
 
-    pass
 
-def SaveTemp():
-    pass
+def SaveMap(name, transform, inverse, keywords):
+   
+    hash_ = security.GenHash([name, transform, inverse, keywords])
+    queryArgs = (hash_, name, transform, inverse, keywords)
+    con.run(f"INSERT INTO maps {queryArgs}")
 
-def LoadTemp():
-    pass
 
 
     

@@ -8,15 +8,14 @@ BEGIN
 	THEN
         CREATE TABLE maps(
             map_id      INT GENERATED ALWAYS AS IDENTITY,
-            map_hash        TEXT,
-            map_name        TEXT,
+            map_hash        TEXT NOT NULL,
+            map_name        TEXT NOT NULL,
             
-            map_keywords    TEXT[],
-
             map_transform   JSON NOT NULL,
             map_inverse     JSON NOT NULL,
-            map_equalities  JSON,
-			
+
+            map_keywords    TEXT[],
+
 			PRIMARY KEY (map_id)
         );
 
@@ -32,19 +31,17 @@ BEGIN
 	THEN
         CREATE TABLE ciphers(
             cipher_id       INT GENERATED ALWAYS AS IDENTITY,
-            cipher_hash     TEXT,
-            cipher_name     TEXT,
+            cipher_hash     TEXT NOT NULL,
+            cipher_name     TEXT NOT NULL,
             
-            map_id          INT,
+            cipher_formula  TEXT NOT NULL,    
+            cipher_inverse  TEXT NOT NULL,
 
             cipher_keywords TEXT[],
-
-            cipher_formula  TEXT NOT NULL,    
-            cipher_inverse  TEXT,  
+            cipher_options  JSON,
             
 			PRIMARY KEY (cipher_id),
-            CONSTRAINT cipher_map
-                FOREIGN KEY(map_id) REFERENCES maps(map_id)
+            
         );
 
         CREATE INDEX idx_cipher_name ON ciphers USING GIN (cipher_name gin_trgm_ops); 

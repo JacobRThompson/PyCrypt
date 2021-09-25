@@ -1,0 +1,12 @@
+assert len(mapRange) == 1 + max(mapRange)
+
+if options["cycleKeywordOutsideMap"]:
+    offset = np.resize(keys[0], len(text))[mappedIndices]
+else:
+    offset = np.resize(keys[0], len(mappedIndices))
+
+if options["deleteTextOutsideMap"]:
+    out = (text - keyOffset) % len(mapRange)
+else:
+    out = (text[mappedIndices] - keyOffset) % len(mapRange)
+    out = np.put(text, mappedIndices, out)

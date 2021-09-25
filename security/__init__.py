@@ -5,15 +5,26 @@ import hashlib
 import os
 import pickle
 
-# TODO: ADD FUNCTIONALITY FOR CLASSES
+# TODO:
 # ADD FUNCTIONALITY FOR "USESECURITY" SETTING
 # WORK OUT DICTS
 # WORK OUT CLASSES
-saltSeed = getpass.getuser()
+
+def GenHash(query: list):
+    """Generates a hash based on a mapQuery or a cipherQuery"""
+
+    # Add user data to hash
+    query.append(getpass.getuser())
+
+    p = pickle.dumps(query)
+    salt = os.urandom(hashlib.blake2b.SALT_SIZE)
+    h = hashlib.blake2b(p, salt=salt)
+
+    return(h.digest())
 
 
 class ProcParser:
-    def __init__(self):
+    def __init__(self, *locals: str):
 
         with open("config.JSON", 'r') as config:
             settings = json.load(config)["security"]
@@ -22,7 +33,8 @@ class ProcParser:
         self.whitelist = set(settings["whitelist"])
         self.blacklist = set(settings["blacklist"])
 
-        self.symbols = {}
+        
+        self.symbols = {var: "__var_name__" for var in locals}
 
     symbolTags = (
         "__func_name__", "__var_name__", "__class_instance__"
@@ -183,28 +195,16 @@ class ProcParser:
         else:
             return alias
 
-    
     def EvalSafety(self, cmd: str, *args):
         temp = ast.parse(cmd, *args)
 
         self.Walk(temp)
 
-def EvalSafety(string):
-    temp = ProcParser()
+
+def EvalSafety(string, *locals: str):
+    temp = ProcParser(*locals)
     temp.EvalSafety(string)
 
-def GenHash(query: list):
-    """Generates a hash based on a mapQuery or a cipherQuery"""
-
-
-    # get location of hash entry in query; then replace it w/ a constant
-    query[1] = saltSeed
-
-    p = pickle.dumps(query)
-    salt = os.urandom(hashlib.blake2b.SALT_SIZE)
-    h = hashlib.blake2b(p, salt=salt)
-
-    return(h.digest())
 
 if __name__ == "__main__" and True:
     import unittest
@@ -221,7 +221,7 @@ if __name__ == "__main__" and True:
         "moduleE"
     }
 
-    def evalTestFile(path):
+    def evalTestFile(path, *locals):
         pp = ProcParser()
         pp.whitelist = testWhitelist
         pp.blacklist = testBlacklist
@@ -254,4 +254,5 @@ if __name__ == "__main__" and True:
             )
 
     unittest.main()
+ 
 
