@@ -55,20 +55,6 @@ def GenInverseMask(x, mask):
     return np.delete(np.arange(x.shape[0]), mask)
 
 
-def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray, maskedIndices=None):
-
-    values = transform[numRepr]
-
-    if maskedIndices is None:
-        indices = np.flatnonzero(values == -1)
-    else:
-        indices = np.union1d(maskedIndices, np.flatnonzero(values == -1))
-
-    np.put(values, indices, numRepr[indices])
-
-    return values, indices
-
-
 def PreprocessKeys(transform, *keys):
     keysOut = []
 
@@ -82,6 +68,20 @@ def PreprocessKeys(transform, *keys):
             keysOut.append(np.delete(k, m))
 
         return keysOut
+
+
+def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray, maskedIndices=None):
+
+    values = transform[numRepr]
+
+    if maskedIndices is None:
+        indices = np.flatnonzero(values == -1)
+    else:
+        indices = np.union1d(maskedIndices, np.flatnonzero(values == -1))
+
+    np.put(values, indices, numRepr[indices])
+
+    return values, indices
 
 def ApplyFormula(formula, text, keys, mapRange, mappedIndices, options,
     pp=security.ProcParser("text", "keys", "mapRange", "mappedIndices", "options")):

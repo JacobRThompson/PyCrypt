@@ -2,11 +2,14 @@
 import json
 import pg8000
 import numpy as np
+import sys,os
 
+sys.path.insert(1, os.path.abspath('.'))
 import security
 
-tempCiphers, tempMaps = {}, {}
 con: pg8000.Connection = None
+
+# TODO: add check for proper table formating, even if database already exists
 
 def init() -> pg8000.Connection:
 
@@ -58,6 +61,10 @@ def init() -> pg8000.Connection:
         with open("database/initDB.SQL", 'r') as infile:
             _con.run(infile.read())
             _con.commit()
+
+        # give user privileges to newly-created tabels    
+        _con.run("GRANT SELECT, UPDATE, INSERT ON ciphers, maps TO pycrypt_default_user")
+        _con.commit()
         _con.close()
 
         # Reconnect with lower privileges
@@ -68,19 +75,19 @@ def init() -> pg8000.Connection:
 
     return con
 
-def LoadSavedata(cipher=None, map=None) -> list:
+def LoadNamedData(cipher=None, map=None) -> list:
     assert cipher is None or type(cipher) == str
     assert map is None or type(map) == str
     assert con  # Make sure that we initalized module
 
     if map:
-        mapQuery = con.run(f"SELECT * FROM maps WHERE map_name ={map}")[0]
+        mapQuery = con.run(f"SELECT * FROM maps WHERE map_name ={map} LIMIT 1")[0]
         assert mapQuery is not None
     else:
         mapQuery = None
 
     if cipher:
-        cipherQuery = con.run(f"SELECT * FROM ciphers WHERE cipher_name={cipher}")[0]
+        cipherQuery = con.run(f"SELECT * FROM ciphers WHERE cipher_name={cipher} LIMIT 1")[0]
         assert cipherQuery is not None
     else:
         cipherQuery = None
@@ -103,20 +110,28 @@ def LoadSavedata(cipher=None, map=None) -> list:
 def SaveCipher(name, formula, inverse, keywords, options):
 
     hash_ = security.GenHash([name, formula, inverse, keywords, options])
-    queryArgs = (hash_, name, formula, inverse, keywords, options)
-    con.run(f"INSERT INTO ciphers VALUES {queryArgs}")
+    jOptions = json.dumps(options)
+
+    # Add escape characters to formulas so SQL insert doesn't break
+
+    name = name.replace("'", "''")
+    formula = formula.replace("'", "''")
+    inverse = inverse.replace("'", "''")
+
+    queryStr = f"""(ARRAY{hash_},'{name}','{formula}','{inverse}', ARRAY{keywords},'{jOptions}')"""
+    columnStr = """(cipher_hash, cipher_name, cipher_formula, cipher_inverse, cipher_keywords, cipher_options)"""
+
+    con.run(f"""INSERT INTO ciphers {columnStr} VALUES {queryStr}""")
+    con.commit()
+    
 
 
 def SaveMap(name, transform, inverse, keywords):
    
+    
     hash_ = security.GenHash([name, transform, inverse, keywords])
-    queryArgs = (hash_, name, transform, inverse, keywords)
+    
+    queryArgs = ('hash_', name, transform, inverse, keywords)
     con.run(f"INSERT INTO maps {queryArgs}")
 
-
-
-    
-
 init()
-
-print("Done. Somehow.")

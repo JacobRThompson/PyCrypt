@@ -8,7 +8,7 @@ BEGIN
 	THEN
         CREATE TABLE maps(
             map_id      INT GENERATED ALWAYS AS IDENTITY,
-            map_hash        TEXT NOT NULL,
+            map_hash        SMALLINT[],
             map_name        TEXT NOT NULL,
             
             map_transform   JSON NOT NULL,
@@ -31,7 +31,7 @@ BEGIN
 	THEN
         CREATE TABLE ciphers(
             cipher_id       INT GENERATED ALWAYS AS IDENTITY,
-            cipher_hash     TEXT NOT NULL,
+            cipher_hash     SMALLINT[],
             cipher_name     TEXT NOT NULL,
             
             cipher_formula  TEXT NOT NULL,    
@@ -40,7 +40,7 @@ BEGIN
             cipher_keywords TEXT[],
             cipher_options  JSON,
             
-			PRIMARY KEY (cipher_id),
+			PRIMARY KEY (cipher_id)
             
         );
 

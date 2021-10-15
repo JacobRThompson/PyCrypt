@@ -4,6 +4,7 @@ import json
 import hashlib
 import os
 import pickle
+import numpy as np
 
 # TODO:
 # ADD FUNCTIONALITY FOR "USESECURITY" SETTING
@@ -20,7 +21,8 @@ def GenHash(query: list):
     salt = os.urandom(hashlib.blake2b.SALT_SIZE)
     h = hashlib.blake2b(p, salt=salt)
 
-    return(h.digest())
+    # NOTE: the nonesense around h.digest() converts bytes into array of small ints
+    return(np.frombuffer(h.digest(), dtype=np.int16).tolist())
 
 
 class ProcParser:
