@@ -23,14 +23,6 @@ def Decode(numRepr: np.ndarray) -> str:
     return numRepr.tobytes().decode("utf32")
 
 
-def CompressTransform(transform: np.ndarray) -> dict[str, int]:
-
-    indices = np.flatnonzero(transform >= 0)
-    values = transform[indices]
-    keys = Decode(indices)[::2]     #I Have no idea why \x00 gets added. Nonetheless we filter them out
-    return {key: value for key, value in zip(keys, values)}
-
-
 def DecompressTransform(transform: dict[str, int]):
     out = np.copy(emptyTransform)
 
@@ -38,7 +30,33 @@ def DecompressTransform(transform: dict[str, int]):
     range = tuple(transform.values())
 
     np.put(out, domain, range)
-    return out, set(domain), set(range)
+    return out, set(range)
+
+
+def DecompressInverse(inverse: dict[int, int]):
+    out = np.copy(emptyTransform)
+
+    domain = tuple(inverse.keys())
+    range = tuple(inverse.values())
+
+    np.put(out, domain, range)
+    return out, set(range)
+
+
+def CompressTransform(transform: np.ndarray) -> dict[str, int]:
+
+    indices = np.flatnonzero(transform >= 0)
+    values = transform[indices]
+    keys = Decode(indices)[::2]     #I Have no idea why \x00 gets added. Nonetheless we filter them out
+    return {key: value for key, value in zip(keys.tolist(), values.tolist())}
+
+
+def CompressInverse(inverse: np.ndarray) -> dict[int, int]:
+
+    indices = np.flatnonzero(inverse >= 0)
+    values = inverse[indices]
+    
+    return {int(key): value for key, value in zip(indices.tolist(), values.tolist())}
 
 
 def GenInverseTransform(transform: np.ndarray) -> np.ndarray:
@@ -49,7 +67,6 @@ def GenInverseTransform(transform: np.ndarray) -> np.ndarray:
 
     np.put(out, domain, range)
     return out
-
 
 def GenInverseMask(x, mask):
     return np.delete(np.arange(x.shape[0]), mask)
@@ -83,13 +100,16 @@ def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray, maskedIndices=Non
 
     return values, indices
 
-def ApplyFormula(formula, text, keys, mapRange, mappedIndices, options,
-    pp=security.ProcParser("text", "keys", "mapRange", "mappedIndices", "options")):
-
+def ApplyFormula(formula, text, keys, mapRange, maskedIndices, options={}):
+    pp=security.ProcParser("text", "keys", "mapRange", "mappedIndices", "maskedIndices", "options")
     formula = "".join(("import numpy as np\n", formula))
     pp.EvalSafety(formula)
 
-    _localsVars = {}
+    # PROCESS KEYS!!!!
+
+
+    mappedIndices = np.delete(np.ararnge(len(text)), maskedIndices)
+    _localsVars = {"mapRange":mapRange, "mappedIndices":mappedIndices, "maskedIndices":maskedIndices, **options}
     exec(formula, {}, _localsVars)
 
     return _localsVars['out']

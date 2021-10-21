@@ -109,25 +109,28 @@ def LoadNamedData(cipher=None, map=None) -> list:
 
 def SaveMap(name, transform, inverse, keywords):
 
-    hash_ = security.GenHash(name, transform, inverse, keywords)
-
-    # Add escape characters so SQL insert doesn't break
-    name = name.replace("'", "''")
-
     # Generate inverse transform if one is not provided
     if inverse is None:
         trans = core.DecompressTransform(transform)[0]
         inv = core.GenInverseTransform(trans)
-        inverse = core.CompressTransform(inv)
+        inverse = core.CompressInverse(inv)
+
+    # Add escape characters so SQL insert doesn't break
+    name = name.replace("'", "''")
 
     jTransform = json.dumps(transform)
     jInverse = json.dumps(inverse)
 
-    queryStr = f"(ARRAY{hash_},'{name}','{jTransform}','{jInverse}', ARRAY{keywords})"
-    columnStr = """("hash", "name", transform, inverse, keywords)"""
+    queryStr = f"('{name}','{jTransform}','{jInverse}', ARRAY{keywords})"
+    columnStr = """("name", transform, inverse, keywords)"""
 
-    con.run(f"""INSERT INTO maps {columnStr} VALUES {queryStr}""")
+    id = con.run(f"""INSERT INTO maps {columnStr} VALUES {queryStr} RETURNING id""")[0][0]
+    data = con.run(f"""SELECT * FROM maps WHERE id = {id}""")[0]
+    hash_ = security.GenHash(data[0], *data[2:])
+
+    con.run(f"""UPDATE maps SET "hash" = ARRAY{hash_} WHERE id = {id}""")
     con.commit()
+
 
 def SaveCipher(name, formula, inverse, keywords, options):
 
@@ -142,15 +145,28 @@ def SaveCipher(name, formula, inverse, keywords, options):
     columnStr = """("name", formula, inverse, keywords, options)"""
 
     id = con.run(f"""INSERT INTO ciphers {columnStr} VALUES {queryStr} RETURNING id""")[0][0]
-
-    # We load the cipher we just saved so that we can genrate a hash. (saving/
-    # loading data to db changes data slightly, so we have to generate the hash
-    # last)
     data = con.run(f"""SELECT * FROM ciphers WHERE id = {id}""")[0]
     hash_ = security.GenHash(data[0], *data[2:])
 
     con.run(f"""UPDATE ciphers SET "hash" = ARRAY{hash_} WHERE id = {id}""")
     con.commit()
+
+
+def LoadMap(identifier):
+
+    if type(identifier) == int:
+        query = con.run(f"""SELECT * FROM maps WHERE id = {identifier}""")
+    elif type(identifier) == str:
+        query = con.run(f"""SELECT * FROM map WHERE "name" = '{identifier}'""")
+    else:
+        raise TypeError(f"Identifier must be an integer or a string. A {type(identifier)} was given instead.")
+
+    for entry in query:
+        if entry[1] != security.GenHash(entry[0], *entry[2:]):
+            raise Exception(f"Hash discrepancy found")
+
+    # format output
+    return query[0] if len(query) == 1 else query
 
 def LoadCipher(identifier):
 
@@ -168,7 +184,20 @@ def LoadCipher(identifier):
     # format output
     return query[0] if len(query) == 1 else query
 
+def LoadMap(identifier):
 
-def LoadMap(identifier): return Load(identifier, "maps")
+    if type(identifier) == int:
+        query = con.run(f"""SELECT * FROM maps WHERE id = {identifier}""")
+    elif type(identifier) == str:
+        query = con.run(f"""SELECT * FROM maps WHERE "name" = '{identifier}'""")
+    else:
+        raise TypeError(f"Identifier must be an integer or a string. A {type(identifier)} was given instead.")
+
+    for entry in query:
+        if entry[1] != security.GenHash(entry[0], *entry[2:]):
+            raise Exception(f"Hash discrepancy found")
+
+    # format output
+    return query[0] if len(query) == 1 else query
 
 init()
