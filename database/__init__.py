@@ -1,11 +1,12 @@
-
 import json
 import pg8000
+import getpass
 import numpy as np
 import sys,os
 
 sys.path.insert(1, os.path.abspath('.'))
 import security
+import core
 
 con: pg8000.Connection = None
 
@@ -28,8 +29,7 @@ def init() -> pg8000.Connection:
 
         # Used for testing purposes to avoid constant retyping of password
         # TODO: IMPLEMENT PROPER SYSTEM
-        with open("C:/Users/jacob/Desktop/postgreSQL_password.txt", 'r') as infile:
-            password = infile.readline()
+        password = getpass.getpass()
 
         # connect as a superuser so we can create things as needed
         _con = pg8000.connect(user='postgres', password=password, port=portNo)
@@ -75,6 +75,7 @@ def init() -> pg8000.Connection:
 
     return con
 
+"""
 def LoadNamedData(cipher=None, map=None) -> list:
     assert cipher is None or type(cipher) == str
     assert map is None or type(map) == str
@@ -104,34 +105,70 @@ def LoadNamedData(cipher=None, map=None) -> list:
         security.EvalSafety(cipherQuery[3])
         security.EvalSafety(cipherQuery[4])
 
-    return (cipherQuery, mapQuery)
+    return (cipherQuery, mapQuery)"""
 
+def SaveMap(name, transform, inverse, keywords):
+
+    hash_ = security.GenHash(name, transform, inverse, keywords)
+
+    # Add escape characters so SQL insert doesn't break
+    name = name.replace("'", "''")
+
+    # Generate inverse transform if one is not provided
+    if inverse is None:
+        trans = core.DecompressTransform(transform)[0]
+        inv = core.GenInverseTransform(trans)
+        inverse = core.CompressTransform(inv)
+
+    jTransform = json.dumps(transform)
+    jInverse = json.dumps(inverse)
+
+    queryStr = f"(ARRAY{hash_},'{name}','{jTransform}','{jInverse}', ARRAY{keywords})"
+    columnStr = """("hash", "name", transform, inverse, keywords)"""
+
+    con.run(f"""INSERT INTO maps {columnStr} VALUES {queryStr}""")
+    con.commit()
 
 def SaveCipher(name, formula, inverse, keywords, options):
 
-    hash_ = security.GenHash([name, formula, inverse, keywords, options])
     jOptions = json.dumps(options)
 
     # Add escape characters to formulas so SQL insert doesn't break
-
     name = name.replace("'", "''")
     formula = formula.replace("'", "''")
     inverse = inverse.replace("'", "''")
 
-    queryStr = f"""(ARRAY{hash_},'{name}','{formula}','{inverse}', ARRAY{keywords},'{jOptions}')"""
-    columnStr = """(cipher_hash, cipher_name, cipher_formula, cipher_inverse, cipher_keywords, cipher_options)"""
+    queryStr = f"('{name}','{formula}','{inverse}', ARRAY{keywords},'{jOptions}')"
+    columnStr = """("name", formula, inverse, keywords, options)"""
 
-    con.run(f"""INSERT INTO ciphers {columnStr} VALUES {queryStr}""")
+    id = con.run(f"""INSERT INTO ciphers {columnStr} VALUES {queryStr} RETURNING id""")[0][0]
+
+    # We load the cipher we just saved so that we can genrate a hash. (saving/
+    # loading data to db changes data slightly, so we have to generate the hash
+    # last)
+    data = con.run(f"""SELECT * FROM ciphers WHERE id = {id}""")[0]
+    hash_ = security.GenHash(data[0], *data[2:])
+
+    con.run(f"""UPDATE ciphers SET "hash" = ARRAY{hash_} WHERE id = {id}""")
     con.commit()
-    
+
+def LoadCipher(identifier):
+
+    if type(identifier) == int:
+        query = con.run(f"""SELECT * FROM ciphers WHERE id = {identifier}""")
+    elif type(identifier) == str:
+        query = con.run(f"""SELECT * FROM ciphers WHERE "name" = '{identifier}'""")
+    else:
+        raise TypeError(f"Identifier must be an integer or a string. A {type(identifier)} was given instead.")
+
+    for entry in query:
+        if entry[1] != security.GenHash(entry[0], *entry[2:]):
+            raise Exception(f"Hash discrepancy found")
+
+    # format output
+    return query[0] if len(query) == 1 else query
 
 
-def SaveMap(name, transform, inverse, keywords):
-   
-    
-    hash_ = security.GenHash([name, transform, inverse, keywords])
-    
-    queryArgs = ('hash_', name, transform, inverse, keywords)
-    con.run(f"INSERT INTO maps {queryArgs}")
+def LoadMap(identifier): return Load(identifier, "maps")
 
 init()

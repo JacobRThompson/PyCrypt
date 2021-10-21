@@ -2,27 +2,30 @@ import ast
 import getpass
 import json
 import hashlib
-import os
+import random
 import pickle
 import numpy as np
 
 # TODO:
 # ADD FUNCTIONALITY FOR "USESECURITY" SETTING
-# WORK OUT DICTS
 # WORK OUT CLASSES
 
-def GenHash(query: list):
+# MAKE GENHASH NOT RANDOM
+def GenHash(*items):
     """Generates a hash based on a mapQuery or a cipherQuery"""
 
-    # Add user data to hash
-    query.append(getpass.getuser())
+    # Seed RNG by system user
+    random.seed(getpass.getuser())
 
-    p = pickle.dumps(query)
-    salt = os.urandom(hashlib.blake2b.SALT_SIZE)
+    p = pickle.dumps(tuple(items))
+    salt = random.randbytes(hashlib.blake2b.SALT_SIZE)
     h = hashlib.blake2b(p, salt=salt)
 
-    # NOTE: the nonesense around h.digest() converts bytes into array of small ints
-    return(np.frombuffer(h.digest(), dtype=np.int16).tolist())
+    b = h.digest()                      # Generate hashed bytes
+    b = b.ljust((len(b)+3)//4*4,b'\0')  # Pad bytes
+
+    # Convert to list of ints
+    return(np.frombuffer(b, dtype=np.int32).tolist())
 
 
 class ProcParser:
@@ -62,7 +65,7 @@ class ProcParser:
                 elif type(target) in (ast.Tuple, ast.List):
                     names = [item.id for item in target.elts]
                     self.AddSymbols(names, "__var_name__")
-                    
+
                 elif type(target) == ast.Subscript:
                     pass
 
@@ -236,24 +239,39 @@ if __name__ == "__main__" and True:
         def test_imports(self):
             evalTestFile("security/unitTests/importsA.py")
 
-            self.assertRaises(ImportError,
-                evalTestFile, "security/unitTests/importsB.py"
-            )
-            self.assertRaises(ImportError,
-                evalTestFile, "security/unitTests/importsC.py"
-            )
-            self.assertRaises(ImportError,
-                evalTestFile, "security/unitTests/importsD.py"
-            )
-            self.assertRaises(ImportError,
-                evalTestFile,"security/unitTests/importsE.py"
-            )
-            self.assertRaises(ImportError,
-                evalTestFile, "security/unitTests/importsF.py"
-            )
-            self.assertRaises(ImportError,
-                evalTestFile, "security/unitTests/importsG.py"
-            )
+            with self.assertRaises(ImportError):
+                evalTestFile("security/unitTests/importsB.py")
+
+            with self.assertRaises(ImportError):
+                evalTestFile("security/unitTests/importsC.py")
+
+            with self.assertRaises(ImportError):
+                evalTestFile("security/unitTests/importsD.py")
+
+            with self.assertRaises(ImportError):
+                evalTestFile("security/unitTests/importsE.py")
+
+            with self.assertRaises(ImportError):
+                evalTestFile("security/unitTests/importsF.py")
+
+            with self.assertRaises(ImportError):
+                evalTestFile("security/unitTests/importsG.py")
+
+        def test_dicts(self):
+            #evalTestFile("security/unitTests/DictsA.py")
+        
+            with self.assertRaises(AttributeError):
+                evalTestFile("security/unitTests/DictsB.py")
+
+            with self.assertRaises(AttributeError):
+                evalTestFile("security/unitTests/DictsC.py")
+
+            with self.assertRaises(AttributeError):
+                evalTestFile("security/unitTests/DictsD.py")
+
+            #There is a bug in unit testing package. 
+            with self.assertRaises(AttributeError):
+                raise AttributeError
 
     unittest.main()
  

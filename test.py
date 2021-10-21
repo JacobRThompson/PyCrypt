@@ -1,9 +1,9 @@
 import database
 
-if len(database.con.run("SELECT 1 FROM ciphers WHERE cipher_name='vigenere'")) == 0:
+if len(database.con.run("""SELECT 1 FROM ciphers WHERE "name"='vigenere'""")) == 0:
 
     keywords = ["vigenere","caesar","polyalphabetic"]
-    options = {"cycleKeywordOutsideMap":False, "deleteTextOutsideMap":True}
+    options = {"cycleKeywordOutsideMap": False, "deleteTextOutsideMap": True}
 
     formulaStr = """
     assert len(mapRange) == 1 + max(mapRange)
@@ -36,3 +36,6 @@ if len(database.con.run("SELECT 1 FROM ciphers WHERE cipher_name='vigenere'")) =
     """
 
     database.SaveCipher("vigenere", formulaStr, inverseStr, keywords, options)
+
+query  = database.LoadCipher("vigenere")
+print("done")

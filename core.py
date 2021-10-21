@@ -115,7 +115,7 @@ if __name__ == '__main__' and True:
     plaintext = Encode(p)
 
     inverse = GenInverseTransform(transform)
-
+    
     plaintext, mask = ApplyTransform(plaintext, transform)
     plaintext = ApplyTransform(plaintext, inverse, mask)[0]
 
