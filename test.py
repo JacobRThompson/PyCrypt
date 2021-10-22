@@ -1,5 +1,5 @@
 import database
-import core
+from core import *
 
 if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 0:
     transform = {
@@ -10,15 +10,13 @@ if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 
         "U":20, "u":20, "V":21, "v":21, "W":22, "w":22, "X":23, "x":23, "Y":24, "y":24,
         "Z":25, "z":25}
 
-    t = core.DecompressTransform(transform)[0]
-    i = core.GenInverseTransform(t)
-    inverse = core.CompressInverse(i)
+    t = DecompressTransform(transform)[0]
+    i = GenInverseTransform(t)
+    inverse = CompressInverse(i)
 
     keywords = ["alpha", "lower", "ascii", "alphabet"]
 
     database.SaveMap("alphaLower", transform, inverse, keywords)
-
-
 
 if len(database.con.run("""SELECT 1 FROM ciphers WHERE "name"='vigenere'""")) == 0:
 
@@ -26,36 +24,71 @@ if len(database.con.run("""SELECT 1 FROM ciphers WHERE "name"='vigenere'""")) ==
     options = {"cycleKeywordOutsideMap": False, "deleteTextOutsideMap": True}
 
     formulaStr = """
-    assert len(mapRange) == 1 + max(mapRange)
+assert len(mapRange) == 1 + max(mapRange)
 
-    if options["cycleKeywordOutsideMap"]:
-        offset = np.resize(keys[0], len(text))[mappedIndices]
+if options["cycleKeywordOutsideMap"]:
+    offset = np.resize(keys[0], len(text))[mappedIndices]
 
-    else:
-        offset = np.resize(keys[0], len(mappedIndices))
+else:
+    offset = np.resize(keys[0], len(mappedIndices))
 
-    out = (text[mappedIndices] + offset) % len(mapRange)
+out = (text[mappedIndices] + offset) % len(mapRange)
 
-    if not options["deleteTextOutsideMap"]:
-        out = np.put(text, mappedIndices, out)
-    """
+if not options["deleteTextOutsideMap"]:
+    text[mappedIndices] = out
+    out = text
+
+print(out)
+"""
 
     inverseStr = """
-    assert len(mapRange) == 1 + max(mapRange)
+assert len(mapRange) == 1 + max(mapRange)
 
-    if options["cycleKeywordOutsideMap"]:
-        offset = np.resize(keys[0], len(text))[mappedIndices]
-    else:
-        offset = np.resize(keys[0], len(mappedIndices))
+if options["cycleKeywordOutsideMap"]:
+    offset = np.resize(keys[0], len(text))[mappedIndices]
+else:
+    offset = np.resize(keys[0], len(mappedIndices))
 
-    if options["deleteTextOutsideMap"]:
-        out = (text - offset) % len(mapRange)
-    else:
-        out = (text[mappedIndices] - offset) % len(mapRange)
-        out = np.put(text, mappedIndices, out)
-    """
+if options["deleteTextOutsideMap"]:
+    out = (text - offset) % len(mapRange)
+else:
+    out = (text[mappedIndices] - offset) % len(mapRange)
+
+    text[mappedIndices] = out
+    out = text
+"""
+
+    print(formulaStr)
 
     database.SaveCipher("vigenere", formulaStr, inverseStr, keywords, options)
 
-query  = database.LoadCipher("vigenere")
-print("done")
+
+plaintext = "Attack at dawn"
+keyword = "lemon"
+
+mapQuery = database.LoadMap("alphaLower")
+cipherQuery = database.LoadCipher("vigenere")
+
+transform, mapRange = DecompressTransform(mapQuery[3])
+inverse, inverseRange = DecompressInverse(mapQuery[4])
+
+keys = ProcessKeys(transform, keyword)
+numRepr = Encode(plaintext)
+
+mappedText, maskedIndices = ApplyTransform(numRepr, transform)
+
+print(mappedText)
+
+options = {"deleteTextOutsideMap": False, "cycleKeywordOutsideMap": False}
+
+encryptedText = ApplyFormula(cipherQuery[3], mappedText, keys, mapRange, maskedIndices, options=options)
+
+test = ApplyTransform(encryptedText, inverse)[0]
+test = Decode(test)
+print(test)
+
+decryptedText = ApplyFormula(cipherQuery[4], encryptedText, keys, mapRange, maskedIndices, options=options)
+
+test2 = ApplyTransform(decryptedText, inverse)[0]
+test2 = Decode(test2)
+print(test2)

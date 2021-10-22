@@ -48,7 +48,7 @@ def CompressTransform(transform: np.ndarray) -> dict[str, int]:
     indices = np.flatnonzero(transform >= 0)
     values = transform[indices]
     keys = Decode(indices)[::2]     #I Have no idea why \x00 gets added. Nonetheless we filter them out
-    return {key: value for key, value in zip(keys.tolist(), values.tolist())}
+    return {key: value for key, value in zip(keys, values.tolist())}
 
 
 def CompressInverse(inverse: np.ndarray) -> dict[int, int]:
@@ -72,7 +72,7 @@ def GenInverseMask(x, mask):
     return np.delete(np.arange(x.shape[0]), mask)
 
 
-def PreprocessKeys(transform, *keys):
+def ProcessKeys(transform, *keys):
     keysOut = []
 
     # NOTE: WE CAN ENCODE IN ALL KEYS IN ONE STEP IF PERFORMANCE BECOMES BAD
@@ -81,10 +81,14 @@ def PreprocessKeys(transform, *keys):
             keysOut.append(key)
 
         else:
+            # if key is a string, cast it to array of ints by encoding
             k, m = ApplyTransform(Encode(key), transform)
+
+            # we discard characters that fall outside the transform (maybe we
+            # can make this toggleable in the future)
             keysOut.append(np.delete(k, m))
 
-        return keysOut
+    return keysOut
 
 
 def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray, maskedIndices=None):
@@ -101,16 +105,19 @@ def ApplyTransform(numRepr: np.ndarray, transform: np.ndarray, maskedIndices=Non
     return values, indices
 
 def ApplyFormula(formula, text, keys, mapRange, maskedIndices, options={}):
-    pp=security.ProcParser("text", "keys", "mapRange", "mappedIndices", "maskedIndices", "options")
-    formula = "".join(("import numpy as np\n", formula))
+    # Keys need to be processed before hand
+    # TODO add better functionality for auto-importing modules
+
+    pp = security.ProcParser("text", "keys", "mapRange", "mappedIndices", "maskedIndices", "options", numpy="np")
     pp.EvalSafety(formula)
 
-    # PROCESS KEYS!!!!
+    mappedIndices = np.delete(np.arange(len(text)), maskedIndices)
 
-
-    mappedIndices = np.delete(np.ararnge(len(text)), maskedIndices)
-    _localsVars = {"mapRange":mapRange, "mappedIndices":mappedIndices, "maskedIndices":maskedIndices, **options}
-    exec(formula, {}, _localsVars)
+    _localsVars = {
+        "keys": keys, "options": options, "text": text, "mapRange": mapRange,
+        "mappedIndices": mappedIndices, "maskedIndices": maskedIndices
+    }
+    exec(formula, {"np": np},  _localsVars)
 
     return _localsVars['out']
 

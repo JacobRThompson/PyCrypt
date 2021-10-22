@@ -1,4 +1,5 @@
 import ast
+import builtins
 import getpass
 import json
 import hashlib
@@ -29,7 +30,7 @@ def GenHash(*items):
 
 
 class ProcParser:
-    def __init__(self, *locals: str):
+    def __init__(self, *locals: str, **modules):
 
         with open("config.JSON", 'r') as config:
             settings = json.load(config)["security"]
@@ -38,8 +39,14 @@ class ProcParser:
         self.whitelist = set(settings["whitelist"])
         self.blacklist = set(settings["blacklist"])
 
-        
-        self.symbols = {var: "__var_name__" for var in locals}
+        self.builtIns = set(settings["built-ins"])
+
+        # Register all pre-defined symbols
+        self.symbols = {
+            **{var: "__var_name__" for var in locals},
+            **{func: "__func_name__" for func in self.builtIns},
+            **{alias: name for name, alias in modules.items()}
+        }
 
     symbolTags = (
         "__func_name__", "__var_name__", "__class_instance__"
@@ -269,7 +276,8 @@ if __name__ == "__main__" and True:
             with self.assertRaises(AttributeError):
                 evalTestFile("security/unitTests/DictsD.py")
 
-            #There is a bug in unit testing package. 
+            #There is a bug in unit testing package in the python version that
+            #I am running. This lets me know that unit tests competed.
             with self.assertRaises(AttributeError):
                 raise AttributeError
 

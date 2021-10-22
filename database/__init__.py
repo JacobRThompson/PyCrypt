@@ -12,7 +12,7 @@ con: pg8000.Connection = None
 
 # TODO: add check for proper table formating, even if database already exists
 
-def init() -> pg8000.Connection:
+def Init() -> pg8000.Connection:
 
     global con
 
@@ -45,7 +45,7 @@ def init() -> pg8000.Connection:
             _con.run("CREATE DATABASE pycrypt")
             _con.autocommit = False
 
-        with open("database/initUser.SQL", 'r') as infile:
+        with open("database/InitUser.SQL", 'r') as infile:
             _con.run(infile.read())
 
             # TODO: Query if extension is available & create procedure for install
@@ -58,7 +58,7 @@ def init() -> pg8000.Connection:
             user='postgres', database="pycrypt", password=password,
             port=portNo)
 
-        with open("database/initDB.SQL", 'r') as infile:
+        with open("database/InitDB.SQL", 'r') as infile:
             _con.run(infile.read())
             _con.commit()
 
@@ -79,7 +79,7 @@ def init() -> pg8000.Connection:
 def LoadNamedData(cipher=None, map=None) -> list:
     assert cipher is None or type(cipher) == str
     assert map is None or type(map) == str
-    assert con  # Make sure that we initalized module
+    assert con  # Make sure that we Initalized module
 
     if map:
         mapQuery = con.run(f"SELECT * FROM maps WHERE map_name ={map} LIMIT 1")[0]
@@ -200,4 +200,4 @@ def LoadMap(identifier):
     # format output
     return query[0] if len(query) == 1 else query
 
-init()
+Init()

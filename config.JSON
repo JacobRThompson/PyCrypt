@@ -5,6 +5,14 @@
 
     "security":{
         "useSecurity":false,
+        "built-ins":[
+            "len",
+            "assert",
+            "raise",
+            "max",
+            "min",
+            "print"
+        ],
         "whitelist":[
             "numpy",
             "numpy.random",
