@@ -2,15 +2,14 @@
 
 Note: Documentation is currently under construction
 
-<h2>Table of Contents</h2>
+<h3>Table of Contents</h3>
 
 
-### 1. [Example Use](#example)
-### 2. [Overview](#core)
-### 3. [Database](#database)
-### 4. [Security (WIP)](#security)
+1. [Example Use](#example)
+2. [Overview](#core)
+3. [Database](#database)
+4. [Security (WIP)](#security)
 
-<br></br>
 <h1>Example Use</h1><a name="example"></a>
 
 The below code assumes that the map `alphaLower` and the cipher `vigenere` are
@@ -56,33 +55,98 @@ for large-scale operations is non-trivial and may yield different outcomes
 depending on which assumptions are made by the user. For instance, do we assign
 a value of zero to any character? Do we include punctuation? Do capital and
 lower-case letters map to the same value? To remedy this, we give the user full
-freedom to determine the value assigned to each unicode character. 
-
-A simplified overview of this process is given below
+freedom to determine the value assigned to each unicode character. A simplified overview of this process is given below
 
 <figure>
     <img src="mapDiagram.png">
+    <figcaption> Terrible low-rez image will be replaced with a better one at a later date </figcaption>
 </figure>
 
+<h3><b>DecompressTransform</b>(<i>transform</i>)</h3>
+Returns two items: a decompressed array through which the mapping process is preformed, and a set detailing all possible values that a character within the transform may map to.
+<DL>
+    <DT><i>transform</i>
+    <DD>The JSON string (typically loaded from our database) detailing values any number of charaters map to
+    <DT>
+</DL>
+
+<h3><b>DecompressInverse</b>(<i>inverse</i>)</h3>
+Returns two items: a decompressed array through which the mapping process is undone, and a set detailing all possible values that a integer within the inverse may map to.
+<DL>
+    <DT><i>inverse</i>
+    <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
+    <DT>
+</DL>
+
+<h3><b>ApplyTransform</b>(<i>numRepr, transform, maskedIndices=None</i>)</h3>
+<DL>
+    <DT><i>numRepr</i>
+    <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
+    <DT>
+    <DT><i>transform</i>
+    <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
+    <DT><i>maskedIndices</i>
+    <DD> Sample Text
+</DL>
+
+<h2>Cipher Formulas</h2>
+
+Formulas are composed of snippets of Python/Numpy code, subject to user-defined
+restrictions. Before execution, the contents of the snippet is parsed using
+abstract tree syntax. A whitelist and blacklist of permitted/banned functions
+and modules are supplied by config.JSON, and the use of banned attribitues will
+raise an exception during the security scan.
+
+The names <code>__func_name__</code> , <code>__var_name__</code> , and
+<code>__class_instance__</code> are reserved and will raise exceptions if used
+within the formula's text. The value of the local <code>out</code> is will be
+returned after a formula's evaluation. The user is free to define functions,
+lambdas,and local variables within a formula without triggering the security
+system. Functionality for classes are currently a work in progress.
+
+The locals <code>maskedIndices</code>, <code>mappedIndices</code> and
+<code>mapRange</code> are supplied to the formula during execution and
+<code>numpy</code> is automatically imported as <code>np</code> at run time.
+A list <code>keys</code> and dict <code>options</code> contain  the parameters
+a user may feed to formula during execution. In the example below,
+<code>keys</code> contains one value: an array corresponding to a passed
+keyword, and <code>options</code> contains two entries:
+<code>"cycleKeywordOutsideMap"</code> and <code>"deleteTextOutsideMap"</code>,
+both of which are bools. 
+
+
+```python
+assert len(mapRange) == 1 + max(mapRange)
+
+if options["cycleKeywordOutsideMap"]:
+    offset = np.resize(keys[0], len(text))[mappedIndices]
+
+else:
+    offset = np.resize(keys[0], len(mappedIndices))
+
+out = (text[mappedIndices] + offset) % len(mapRange)
+
+if not options["deleteTextOutsideMap"]:
+    out = np.put(text, mappedIndices, out)
+```
 
 <h1>Database</h1><a name="database"></a>
 
-<h2><b>database.Init()</b></h2>
+<h3><b>database.Init()</b></h3>
 
 This function is automatically called when importing <code>database</code> and is
 responsible for establishing a connection to PyCrypt. If the
 necessary database or user does not exist, they will be created.
-<br></br>
 
-<h2><b>database.con</b></h2>
+<h3><b>database.con</b></h3>
 
 The <code>pg8000.native.Connection</code> object created by calling
 <code>database.Init()</code>. This is used to interact with the PyCrypt
 Database. See [pg8000 documentaion](https://github.com/tlocke/pg8000) for more
 information.
-<br></br>
 
-<h2><b>database.SaveMap</b>(<i>name, transform, inverse, keywords</i>)</h2>
+
+<h3><b>database.SaveMap</b>(<i>name, transform, inverse, keywords</i>)</h3>
 
 <DL>
     <DT><i>name</i>
@@ -107,10 +171,10 @@ if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 
         "U":20, "u":20, "V":21, "v":21, "W":22, "w":22, "X":23, "x":23, "Y":24, "y":24,
         "Z":25, "z":25}
 
-    t = core.DecompressTransform(transform)[0]
-    i = core.GenInverseTransform(t)
+    t = DecompressTransform(transform)[0]
+    i = GenInverseTransform(t)
 
-    inverse = core.CompressInverse(i)
+    inverse = CompressInverse(i)
 
     keywords = ["alpha", "lower", "ascii", "alphabet"]
 
@@ -118,7 +182,7 @@ if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 
 ```
 <br></br>
 
-<h2><b>database.LoadMap</b>(<i>identifier</i>)</h2>
+<h3><b>database.LoadMap</b>(<i>identifier</i>)</h3>
 
 <DL>
     <DT><i>identifier</i>
@@ -130,13 +194,13 @@ query  = database.LoadMap("alphaLower")
 print(f"Hash of alphaLower map: '{query[1]}'")
 ```
 <br></br>
-<h2><b>database.SaveCipher</b>(<i>name, formula, inverse, keywords, options</i>)</h2>
+<h3><b>database.SaveCipher</b>(<i>name, formula, inverse, keywords, options</i>)</h3>
 
 <DL>
     <DT><i>name</i>
     <DD>The name of the cipher to be added to the database. Will raise an exception the passed name is already taken.
     <DT><i>formula</i>
-    <DD>A string consisting of valid python code that transforms a mapped plaintext array into cypher text. The locals <code>maskedIndices</code>, <code>mappedIndices</code> and <code>mapRange</code> are supplied to the formula during execution. Additionally, <code>numpy</code> is automatically imported as <code>np</code> at run time. The names <code>__func_name__</code> , <code>__var_name__</code> , and <code>__class_instance__</code> are reserved and will raise exceptions if used within the formula's text.
+    <DD>A string consisting of valid python code that transforms a mapped plaintext array into cypher text. 
     <DT><i>inverse</i>
     <DD>Python code that transforms cypher text into plaintext. The rules for the <code>formula</code> parameter apply.
     <DT><i>keywords</i>
