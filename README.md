@@ -1,6 +1,3 @@
-### Test
-
-
 <h1>PyCrypt</h1>
 
 Note: Documentation is currently under construction
