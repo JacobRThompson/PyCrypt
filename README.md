@@ -71,13 +71,12 @@ freedom to determine the value assigned to each unicode character. A simplified 
 Returns two items: a decompressed array through which the mapping process is preformed, and a set detailing all possible values that a character within the transform may map to.
 
 <h3><b>DecompressInverse</b>(<i>inverse</i>)</h3>
-
 <DL>
     <DT><i>inverse</i>
     <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
     <DT>
-    Returns two items: a decompressed array through which the mapping process is undone, and a set detailing all possible values that a integer within the inverse may map to.
 </DL>
+Returns two items: a decompressed array through which the mapping process is undone, and a set detailing all possible values that a integer within the inverse may map to.
 
 <h3><b>ApplyTransform</b>(<i>numRepr, transform, maskedIndices=None</i>)</h3>
 <DL>
