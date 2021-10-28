@@ -134,21 +134,24 @@ if __name__ == '__main__' and True:
         "Z":25, "z":25}
 
 
-    p = "ABCDEFGHIJKLMNOPQRSTUVWXYZ!\t!ThE qUiCk BrOwN dOg JuMpEd OvEr ThE LaZy FoX!\t!abcdefghijklmnopqrstuvwxyz"
+    p = "Vigenere"
 
     transform = DecompressTransform(t)[0]
     tCheck = CompressTransform(transform)
 
+    
     plaintext = Encode(p)
 
     inverse = GenInverseTransform(transform)
     
     plaintext, mask = ApplyTransform(plaintext, transform)
+
+    print(plaintext)
     plaintext = ApplyTransform(plaintext, inverse, mask)[0]
 
     temp = Decode(plaintext)
 
-    print(temp)
+   # print(temp)
     
 
 def GenPlaintext(length=5000):
@@ -157,3 +160,4 @@ def GenPlaintext(length=5000):
 def GenKeywords(n, length=25):
     return [np.random.randint(0, 1114112, length, dtype=np.int32) for i in range(n)]
 
+#print(Encode('Vigenère'))
