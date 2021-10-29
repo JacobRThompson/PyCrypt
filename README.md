@@ -55,40 +55,72 @@ for large-scale operations is non-trivial and may yield different outcomes
 depending on which assumptions are made by the user. For instance, do we assign
 a value of zero to any character? Do we include punctuation? Do capital and
 lower-case letters map to the same value? To remedy this, we give the user full
-freedom to determine the value assigned to each unicode character. A simplified overview of this process is given below
+control over the process that transform unicode characters into an integer array. A simplified overview of this process is given below
 
 <figure>
     <img src="mapDiagram.png">
-    <figcaption> Terrible low-rez image will be replaced with a better one at a later date </figcaption>
+    <figcaption> Terrible low-rez image will be replaced with a better one at a later date. For clarity, we are referring to the array used in step 2 when the <i>transform</i> of a map is mentioned. </figcaption>
 </figure>
 
 <h3><b>DecompressTransform</b>(<i>transform</i>)</h3>
+
 <DL>
-    <DT><i>transform</i>
-    <DD>The JSON string (typically loaded from our database) detailing values any number of charaters map to
-    <DT>
+    <DT><b>params:</b>
+    <DD><DL>
+        <DT><i>transform</i>
+        <DD>The JSON string (typically loaded from our database) detailing values any number of charaters map to
+        <DT>
+    </DL>
+    <DT><b>returns:</b>
+    <DD><DL>
+        <DT><i>transform</i>
+        <DD>An <code>array[int]</code> through which the mapping process is preformed
+        <DT><i>transformRange</i>
+        <DD> A <code>set</code> containing all possible values that may be returned by applying the transform  
+    </DL>
 </DL>
-Returns two items: a decompressed array through which the mapping process is preformed, and a set detailing all possible values that a character within the transform may map to.
+
 
 <h3><b>DecompressInverse</b>(<i>inverse</i>)</h3>
+
 <DL>
-    <DT><i>inverse</i>
-    <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
-    <DT>
+    <DT><b>params:</b>
+    <DD><DL>
+        <DT><i>Inverse</i>
+        <DD>The compressed JSON <code>str</code> detailing the decimal unicode values each <code>int</code> can map to. This is typically loaded from our database or generated through <code>GenInverseTransform()</code>.
+    </DL>
+    <DT><b>returns:</b>
+    <DD><DL>
+        <DT><i>inverse</i>
+        <DD>A <code>array[int]</code> through which the mapping process is undone
+        <DT><i>inverseRange</i>
+        <DD> A <code>set</code> containing all possible values that may be returned by applying the inverse  
+    </DL>
+
 </DL>
-Returns two items: a decompressed array through which the mapping process is undone, and a set detailing all possible values that a integer within the inverse may map to.
+
 
 <h3><b>ApplyTransform</b>(<i>numRepr, transform, maskedIndices=None</i>)</h3>
-<DL>
-    <DT><i>numRepr</i>
-    <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
-    <DT>
-    <DT><i>transform</i>
-    <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
-    <DT><i>maskedIndices</i>
-    <DD> Sample Text
-</DL>
 
+<DL>
+    <DT><b>params:</b>
+    <DD><DL>
+        <DT><i>numRepr</i>
+        <DD>An array of unicode values produced by <code>Encode()</code>
+        <DT>
+        <DT><i>transform</i>
+        <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
+        <DT><i>maskedIndices</i>
+        <DD> An <code>array[int]</code> containing the indices where the transform will not be applied
+    </DL>
+    <DT><b>returns:</b>
+    <DD><DL>
+        <DT><i>transformedValues</i>
+        <DD> An <code>array[int</code>] of mapped values
+        <DT><i>maskedIndices</i>
+        <DD> An <code>array[int]</code> containing the indices where the transform was not applied. These almost always correspond to characters outside of the transform such as spaces, punctuation, and accented characters  
+    </DL>
+</DL>
 <h2>Cipher Formulas</h2>
 
 Formulas are composed of snippets of Python/Numpy code, subject to user-defined
@@ -113,7 +145,6 @@ a user may feed to formula during execution. In the example below,
 keyword, and <code>options</code> contains two entries:
 <code>"cycleKeywordOutsideMap"</code> and <code>"deleteTextOutsideMap"</code>,
 both of which are bools. 
-
 
 ```python
 assert len(mapRange) == 1 + max(mapRange)
@@ -189,11 +220,19 @@ if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 
     <DD>This can be either a sting or an int. If identifier is an integer, <code>database.LoadMap( )</code> will return the map with that ID. Otherwise, it will return all maps whose name matches the passed identifier.
 </DL>
 
+Returns a list of entries matching the identifier. Each entry will contain 6 items, in order:
+
+0. A unique integer ID
+1. A hash formed from user data and the contents of the map
+2. A string name
+3. A compressed JSON transform used to map characters to ints
+4. The compressed inverse transform used convert ints back to characters
+5. A list of keywords (primarily for use within database)
+
 ```python
 query  = database.LoadMap("alphaLower")
 print(f"Hash of alphaLower map: '{query[1]}'")
 ```
-<br></br>
 <h3><b>database.SaveCipher</b>(<i>name, formula, inverse, keywords, options</i>)</h3>
 
 <DL>
@@ -252,5 +291,26 @@ if len(database.con.run("""SELECT 1 FROM ciphers WHERE "name"='vigenere'""")) ==
     database.SaveCipher("vigenere", formulaStr, inverseStr, keywords, options)
 ```
 
+<h2><b>database.LoadCipher</b>(<i>identifier</i>)</h2>
 
+<DL>
+<DT><i>identifier</i>
+<DD>This can be either a sting or an int. If identifier is an integer, <code>database.LoadCipher( )</code> will return the cipher with that ID. Otherwise, it will return all ciphers whose name matches the passed identifier.
+</DL>
+
+Returns a list of entries matching the identifier. Each entry will contain 7 items, in order:
+
+0. A unique integer ID
+1. A hash formed from user data and the contents of the map
+2. A string name
+3. The formula text used for encryption
+4. The inverse formula used for decryption
+5. A list of keywords (primarily for use within database)
+6. A dict whose keys are the names of parameters used in the formula/inverse and
+   whose values are those parameters' default values.
+
+```python
+query  = database.LoadCipher("vigenere")
+print(f"Hash of vigenere cipher: '{query[1]}'")
+```
 
