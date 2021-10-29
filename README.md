@@ -98,7 +98,7 @@ process is undone, and <i>inverseRange</i>, a <code>set</code> containing all po
     <DD> An <code>array[int]</code> containing the indices where the transform will not be applied
 </DL>
 
-Returns <code>array[int</code>] <i>transformedValues</i> and
+Returns <code>array[int]</code> <i>transformedValues</i> and
 <i>maskedIndices</i>, an <code>array[int]</code> containing the indices where the transform was not applied. These almost always correspond to characters outside of the transform such as spaces, punctuation, and accented characters
 
 <h2>Cipher Formulas</h2>
@@ -191,7 +191,7 @@ if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 
 
     database.SaveMap("alphaLower", transform, inverse, keywords)
 ```
-<br></br>
+
 
 <h3><b>database.LoadMap</b>(<i>identifier</i>)</h3>
 
