@@ -59,68 +59,48 @@ control over the process that transform unicode characters into an integer array
 
 <figure>
     <img src="mapDiagram.png">
-    <figcaption> Terrible low-rez image will be replaced with a better one at a later date. For clarity, we are referring to the array used in step 2 when the <i>transform</i> of a map is mentioned. </figcaption>
+    <figcaption> (Terrible low-rez image will be replaced with a better one at a later date. For clarity, we are referring to the array used in step 2 when the <i>transform</i> of a map is mentioned.) </figcaption>
 </figure>
 
 <h3><b>DecompressTransform</b>(<i>transform</i>)</h3>
 
 <DL>
-    <DT><b>params:</b>
-    <DD><DL>
-        <DT><i>transform</i>
-        <DD>The JSON string (typically loaded from our database) detailing values any number of charaters map to
-        <DT>
-    </DL>
-    <DT><b>returns:</b>
-    <DD><DL>
-        <DT><i>transform</i>
-        <DD>An <code>array[int]</code> through which the mapping process is preformed
-        <DT><i>transformRange</i>
-        <DD> A <code>set</code> containing all possible values that may be returned by applying the transform  
-    </DL>
+    <DT><i>transform</i>
+    <DD>The JSON string (typically loaded from our database) detailing values any number of charaters map to
+
+  
 </DL>
 
+Returns two items: <i>transform</i>, an <code>array[int]</code> through which
+the mapping process is preformed, and <i>transformRange</i>, a <code>set</code> containing all possible values that may be returned by applying the transform
 
 <h3><b>DecompressInverse</b>(<i>inverse</i>)</h3>
 
 <DL>
-    <DT><b>params:</b>
-    <DD><DL>
-        <DT><i>Inverse</i>
-        <DD>The compressed JSON <code>str</code> detailing the decimal unicode values each <code>int</code> can map to. This is typically loaded from our database or generated through <code>GenInverseTransform()</code>.
-    </DL>
-    <DT><b>returns:</b>
-    <DD><DL>
-        <DT><i>inverse</i>
-        <DD>A <code>array[int]</code> through which the mapping process is undone
-        <DT><i>inverseRange</i>
-        <DD> A <code>set</code> containing all possible values that may be returned by applying the inverse  
-    </DL>
-
+    <DT><i>Inverse</i>
+    <DD>The compressed JSON <code>str</code> detailing the decimal unicode values each <code>int</code> can map to. This is typically loaded from our database or generated through <code>GenInverseTransform()</code>.
 </DL>
+
+Returns <i>inverse</i>, an <code>array[int]</code> through which the mapping
+process is undone, and <i>inverseRange</i>, a <code>set</code> containing all possible values that may be returned by applying the inverse 
+
 
 
 <h3><b>ApplyTransform</b>(<i>numRepr, transform, maskedIndices=None</i>)</h3>
 
 <DL>
-    <DT><b>params:</b>
-    <DD><DL>
-        <DT><i>numRepr</i>
-        <DD>An array of unicode values produced by <code>Encode()</code>
-        <DT>
-        <DT><i>transform</i>
-        <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
-        <DT><i>maskedIndices</i>
-        <DD> An <code>array[int]</code> containing the indices where the transform will not be applied
-    </DL>
-    <DT><b>returns:</b>
-    <DD><DL>
-        <DT><i>transformedValues</i>
-        <DD> An <code>array[int</code>] of mapped values
-        <DT><i>maskedIndices</i>
-        <DD> An <code>array[int]</code> containing the indices where the transform was not applied. These almost always correspond to characters outside of the transform such as spaces, punctuation, and accented characters  
-    </DL>
+    <DT><i>numRepr</i>
+    <DD>An array of unicode values produced by <code>Encode()</code>
+    <DT>
+    <DT><i>transform</i>
+    <DD>The JSON string (typically loaded from our database) detailing the decimal values of the unicode values a set of values may map to
+    <DT><i>maskedIndices</i>
+    <DD> An <code>array[int]</code> containing the indices where the transform will not be applied
 </DL>
+
+Returns <code>array[int</code>] <i>transformedValues</i> and
+<i>maskedIndices</i>, an <code>array[int]</code> containing the indices where the transform was not applied. These almost always correspond to characters outside of the transform such as spaces, punctuation, and accented characters
+
 <h2>Cipher Formulas</h2>
 
 Formulas are composed of snippets of Python/Numpy code, subject to user-defined
