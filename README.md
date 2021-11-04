@@ -78,7 +78,7 @@ a value of zero to any character? Do we include punctuation? Do capital and
 lower-case letters map to the same value? To remedy this, we give the user full
 control over the process that transform unicode characters into an integer
 array. A simplified overview of this process is given below (The actual
-procedure also returns an array of unchanged/masked indices and also includes features to support masking specific subsections of plaintext).
+procedure also returns an array of unchanged/masked indices and supports masking specific subsections of plaintext).
 
 <figure>
     <img src="mapDiagram.jpg">
