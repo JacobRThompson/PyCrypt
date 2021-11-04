@@ -1,6 +1,10 @@
+"""This script demonstrates the speed of PyCrypt's encryption by encrypting a plaintext copy of ___ and  printing the execution time"""
+
 import database
 from core import *
+import time
 
+# Add map to database if needed
 if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 0:
     transform = {
         "A":0,  "a":0,  "B":1,  "b":1,  "C":2,  "c":2,  "D":3,  "d":3,  "E":4,  "e":4,
@@ -10,7 +14,7 @@ if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 
         "U":20, "u":20, "V":21, "v":21, "W":22, "w":22, "X":23, "x":23, "Y":24, "y":24,
         "Z":25, "z":25}
 
-    t = DecompressTransform(transform)[0]
+    t = DecompressTransform(transform)[0] 
     i = GenInverseTransform(t)
     inverse = CompressInverse(i)
 
@@ -18,6 +22,7 @@ if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 
 
     database.SaveMap("alphaLower", transform, inverse, keywords)
 
+# Add cipher to database if needed
 if len(database.con.run("""SELECT 1 FROM ciphers WHERE "name"='vigenere'""")) == 0:
 
     keywords = ["vigenere","caesar","polyalphabetic"]
@@ -37,8 +42,6 @@ out = (text[mappedIndices] + offset) % len(mapRange)
 if not options["deleteTextOutsideMap"]:
     text[mappedIndices] = out
     out = text
-
-print(out)
 """
 
     inverseStr = """
@@ -57,14 +60,7 @@ else:
     text[mappedIndices] = out
     out = text
 """
-
-    print(formulaStr)
-
     database.SaveCipher("vigenere", formulaStr, inverseStr, keywords, options)
-
-
-plaintext = "Attack at dawn"
-keyword = "lemon"
 
 mapQuery = database.LoadMap("alphaLower")
 cipherQuery = database.LoadCipher("vigenere")
@@ -72,23 +68,21 @@ cipherQuery = database.LoadCipher("vigenere")
 transform, mapRange = DecompressTransform(mapQuery[3])
 inverse, inverseRange = DecompressInverse(mapQuery[4])
 
+
+with open("Moby-Dick.txt", encoding="utf8") as infile:
+    plaintext = infile.read()
+
+keyword = "lemon"
+
 keys = ProcessKeys(transform, keyword)
 numRepr = Encode(plaintext)
 
 mappedText, maskedIndices = ApplyTransform(numRepr, transform)
 
-print(mappedText)
-
 options = {"deleteTextOutsideMap": False, "cycleKeywordOutsideMap": False}
 
+print("begin encryption")
+t = time.time()
 encryptedText = ApplyFormula(cipherQuery[3], mappedText, keys, mapRange, maskedIndices, options=options)
-
-test = ApplyTransform(encryptedText, inverse)[0]
-test = Decode(test)
-print(test)
-
-decryptedText = ApplyFormula(cipherQuery[4], encryptedText, keys, mapRange, maskedIndices, options=options)
-
-test2 = ApplyTransform(decryptedText, inverse)[0]
-test2 = Decode(test2)
-print(test2)
+print(f"time to encrypt Moby Dick: {time.time()-t} sec.\nChars encrypted: {len(encryptedText)}")
+print()
