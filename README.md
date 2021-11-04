@@ -73,10 +73,10 @@ The encryption process is broken into two distinct phases
 
 The matter of converting a unicode string into an array of integers suitable
 for large-scale operations is non-trivial and may yield different outcomes
-depending on which assumptions are made by the user. For instance, do we assign
+depending on the assumptions made by the user. For instance, do we assign
 a value of zero to any character? Do we include punctuation? Do capital and
-lower-case letters map to the same value? To remedy this, we give the user full
-control over the process that transform unicode characters into an integer
+lower-case letters map to the same value? To remedy this, we grant the user full
+control over the process that transforms unicode characters into an integer
 array. A simplified overview of this process is given below (The actual
 procedure also returns an array of unchanged/masked indices and supports masking specific subsections of plaintext).
 
