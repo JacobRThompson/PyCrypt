@@ -12,11 +12,7 @@ The uncompromising nature of this package is best observed by viewing
 <code>speedTest.py</code>, where a Viginere cipher is applied to the entirety of <i>Moby-Dick</i> by Herman
 Melville. On a  4-core 2700 Mhz laptop, encryption took <b>0.176 sec</b>.
 
-<details open>
-
-<summary>
-    <h2 style="display:inline">Table of Contents</h3>
-</summary>
+<h2>Table of Contents</h3>
 
 1. [First-Time Use](#first)
 2. [Quick Example](#example)
@@ -27,8 +23,6 @@ Melville. On a  4-core 2700 Mhz laptop, encryption took <b>0.176 sec</b>.
 4. [Database](#database)
 5. [Security(WIP)](#security)
 
-</details>
-
 <h1>First-Time Use</h1><a name="example"></a>
 
 The PyCrypt database is created the first time <code>PyCrypt.database</code> is imported or <code>PyCrypt.database.init()</code> is called. <br></br>
@@ -36,9 +30,7 @@ The PyCrypt database is created the first time <code>PyCrypt.database</code> is 
 <br></br>
 All future transactions are then conducted through the generated user "pycrypt_default_user"; their privileges are defined in <code>database/initUser.SQL</code>.
 
-
 <h1>Quick Example</h1><a name="example"></a>
-
 
 The below code assumes that the map <i>alphaLower</i> and the cipher <i>vigenere</i> are
 found within the PyCrpyt database. See [database](#database) on saving maps and
@@ -77,11 +69,7 @@ The encryption process is broken into two distinct phases
 - character mapping
 - cipher application
 
-<details open>
-
-<summary>
-    <h2 style="display:inline">Character Mapping</h2><a name="map"></a>
-</summary>
+<h2>Character Mapping</h2><a name="map"></a>
 
 The matter of converting a unicode string into an array of integers suitable
 for large-scale operations is non-trivial and may yield different outcomes
@@ -130,13 +118,7 @@ process is undone and a <code>set</code> containing all possible values that may
 Returns <code>array[int]</code> <i>transformedValues</i> and
 <code>array[int]</code> <i>maskedIndices</i> containing the indices where the transform was not applied. These almost always correspond to characters outside of the transform such as spaces, punctuation, and accented characters
 
-</details>
-
-<details open>
-
-<summary>
-<h2 style="display:inline">Cipher Formulas</h2><a name="formula"></a>
-</summary>
+<h2>Cipher Formulas</h2><a name="formula"></a>
 
 Formulas are composed of snippets of Python/Numpy code, subject to user-defined
 restrictions. Before execution, the contents of the snippet is parsed using
@@ -195,13 +177,7 @@ if not options["deleteTextOutsideMap"]:
 
 </DL>
 
-</details>
-
-<details open>
-
-<summary>
-    <h2 style="display:inline">Other Core Functions</h2><a name="other"></a>
-</summary>
+<h2>Other Core Functions</h2><a name="other"></a>
 
 <h3><b>CompressInverse</b>(<i>inverse</i>)</h3>
 
@@ -231,13 +207,7 @@ Applies <code>array[int]</code> <i>transform</i> without a mask to each <code>st
 <code>list[object]</code> <i>keys</i>, then returns the contents of <i>keys</i>.
 See [here](#ApplyTransform) for details on <code>ApplyTransform()</code>. 
 
-</details>
-
-<details open>
-
-<summary>
-    <h1 style="display:inline">Database</h1><a name="database"></a>
-</summary>
+<h1>Database</h1><a name="database"></a>
 
 <h3><b>database.Init()</b></h3>
 
@@ -252,7 +222,6 @@ The <code>pg8000.native.Connection</code> object created by calling
 Database. See [pg8000 documentaion](https://github.com/tlocke/pg8000) for more
 information.
 
-
 <h3><b>database.SaveMap</b>(<i>name, transform, inverse, keywords</i>)</h3>
 
 <DL>
@@ -265,7 +234,6 @@ information.
     <DT><i>keywords</i>
     <DD>A <code>list[str]</code> containing keywords that can users can by once the passed cipher is added to database.
 </DL>
-
 
 ```python
 # NOTE: This only runs if a map with the name "alphaLower" is not already in the system
@@ -287,7 +255,6 @@ if len(database.con.run("""SELECT 1 FROM maps WHERE "name"='alphaLower'""")) == 
 
     database.SaveMap("alphaLower", transform, inverse, keywords)
 ```
-
 
 <h3><b>database.LoadMap</b>(<i>identifier</i>)</h3>
 
@@ -392,5 +359,5 @@ query  = database.LoadCipher("vigenere")
 print(f"Hash of vigenere cipher: '{query[1]}'")
 ```
 
-</details>
+
 
