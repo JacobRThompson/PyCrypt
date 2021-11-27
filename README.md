@@ -103,7 +103,7 @@ jsonTransform = {
     "U":20, "u":20, "V":21, "v":21, "W":22, "w":22, "X":23, "x":23, "Y":24, "y":24,
     "Z":25, "z":25}
 
-arrayTransform, mapRange = DecompressTransform(jsonTransform)[0]
+arrayTransform, mapRange = DecompressTransform(jsonTransform)
 ```
 
 <h3><b>DecompressInverse</b>(<i>inverse</i>)<a name="DecompressInverse"></a></h3>
