@@ -7,10 +7,10 @@ unicode text on a large scale. It grants the user freedom to write ciphers as
 snippets of actual python code while preventing foul play through a robust, configurable
 security system.    
 
-The uncompromising nature of this package is best observed by viewing
+The preformance of this package is best observed by viewing
 [First-Time Use](#first) and then running
 <code>speedTest.py</code>, where a Viginere cipher is applied to the entirety of <i>Moby-Dick</i> by Herman
-Melville. On a  4-core 2700 Mhz laptop, encryption took <b>0.176 sec</b>.
+Melville. On a low-end 4-core laptop, encryption took <b>0.176 sec</b>.
 
 <h2>Table of Contents</h3>
 
@@ -40,24 +40,33 @@ ciphers.
 from PyCrypt import *
 import PyCrypt.database as database
 
+# Get saved data
+mapQuery = database.LoadMap("alphaLower")
+cipherQuery = database.LoadCipher("vigenere")
+
+# Decompress saved data
+transform, mapRange = DecompressTransform(mapQuery[3])
+inverse, _ = DecompressInverse(mapQuery[4])
+
+# User input
 plaintext = "Attack at dawn"
 keyword = "lemon"
 options = {"deleteTextOutsideMap": False, "cycleKeywordOutsideMap": False}
 
-mapQuery = database.LoadMap("alphaLower")
-cipherQuery = database.LoadCipher("vigenere")
-
-transform, mapRange = DecompressTransform(mapQuery[3])
-inverse, _ = DecompressInverse(mapQuery[4])
-
+# Convert strings to arrays of unicode values
 keys = ProcessKeys(transform, keyword)
 numRepr = Encode(plaintext)
 
+# Remap unicode values
 mappedText, maskedIndices = ApplyTransform(numRepr, transform)
 
+# Encrypt text
 encryptedText = ApplyFormula(cipherQuery[3], mappedText, keys, mapRange, maskedIndices, options=options)
 
+# Reverse mapping
 cipherOut = ApplyTransform(encryptedText, inverse)[0]
+
+# Extract values
 cipherOut = Decode(cipherOut)
 print(cipherOut)
 ```
@@ -76,13 +85,8 @@ for large-scale operations is non-trivial and may yield different outcomes
 depending on the assumptions made by the user. For instance, do we assign
 a value of zero to any character? Do we include punctuation? Do capital and
 lower-case letters map to the same value? To remedy this, we grant the user full
-control over the process that transforms unicode characters into an integer
-array. A simplified overview of this process is given below (The actual
-procedure also returns an array of unchanged/masked indices and supports masking specific subsections of plaintext).
-
-<figure>
-    <img src="mapDiagram.jpg">
-</figure>
+control over the process that transforms unicode characters into a usable integer
+array.
 
 <h3><b>DecompressTransform</b>(<i>transform</i>)<a name="DecompressTransform"></a></h3>
 
@@ -116,6 +120,17 @@ arrayTransform, mapRange = DecompressTransform(jsonTransform)
 Returns an <code>array[int]</code> through which the mapping
 process is undone and a <code>set</code> containing all possible values that may be returned by applying the inverse 
 
+```python
+jsonInverse = {
+    '0' : 97,   '1' : 98,   '2' : 99,   '3' : 100,  '4' : 101,  '5' : 102,  '6' : 103,
+    '7' : 104,  '8' : 105,  '9': 106,   '10': 107,  '11': 108,  '12': 109,  '13': 110,
+    '14': 111,  '15': 112,  '16': 113,  '17': 114,  '18': 115,  '19': 116,  '20': 117,
+    '21': 118,   '22': 119,  '23': 120, '24': 121,  '25': 122
+}
+
+arrayInverse, inverseMapRange = DecompressInverse(jsonInverse)
+```
+
 <h3><b>ApplyTransform</b>(<i>numRepr, transform, maskedIndices=None</i>)<a name="ApplyTransform"></a></h3>
 
 <DL>
@@ -128,8 +143,20 @@ process is undone and a <code>set</code> containing all possible values that may
 </DL>
 
 Returns <code>array[int]</code> <i>transformedValues</i> and
-<code>array[int]</code> <i>maskedIndices</i> containing the indices where the transform was not applied. These almost always correspond to characters outside of the transform such as spaces, punctuation, and accented characters
+<code>array[int]</code> <i>maskedIndices</i> containing the indices where the
+transform was not applied. These almost always correspond to characters outside
+of the transform such as spaces, punctuation, and non-standard characters. 
 
+```python
+plaintext = "The FitnessGram™ Pacer Test is a multistage aerobic..."
+unicode = Encode(plaintext)
+
+# arrayTransform was returned from DecompressTransform()
+mappedText, maskedIndices = ApplyTransform(unicode, arrayTransform)
+
+# mappedText = [19, 7, 4, 32, 5, 8, 19, 13, 4, 18, 18, 6, 17, 0, 12, 8482, ...]
+# maskedIndices = [3, 15, 16, 22, 27, 30, 32, 43, 51, 52, 53]
+```
 <h2>Cipher Formulas</h2><a name="formula"></a>
 
 Formulas are composed of snippets of Python/Numpy code, subject to user-defined
@@ -179,7 +206,7 @@ if not options["deleteTextOutsideMap"]:
     <DT><i>text</i>
     <DD>The <code>array[int]</code> upon which <i>formula</i> is applied.
     <DT><i>keys</i>
-    <DD> The <code>list[]</code> of keywords or key values passed to the formula at runtime. The elements within <i>keys</i> can be of any datatype.
+    <DD> The <code>list[]</code> of keywords or key values passed to the formula at runtime. A cypher may require zero or multiple keys, and the elements within <i>keys</i> can be of any datatype.
     <DT><i>mapRange</i>
     <DD> The <code>array[int]</code> collection of all possible characters produced by <code>ApplyTransform</code> and the mapping process. This value is also returned from <code>database.LoadMap()</code>.
     <DT><i>maskedIndices</i>
@@ -189,6 +216,36 @@ if not options["deleteTextOutsideMap"]:
 
 </DL>
 
+```python
+# User input
+options = {"cycleKeywordOutsideMap": False, "deleteTextOutsideMap": True}
+keyword = "lemon"
+plaintext = "I sexually Identify as an overused sexual identification copypasta. Ever since I was a boy I dreamed of spamming other users with my unfunny wall of text"
+
+# Apply map
+numRepr = Encode(plaintext)
+mappedText, maskedIndices = ApplyTransform(numRepr, transform)
+keys = ProcessKeys(transform, keyword)
+
+# See introductory blurb
+formulaStr = """
+assert len(mapRange) == 1 + max(mapRange)
+
+if options["cycleKeywordOutsideMap"]:
+    offset = np.resize(keys[0], len(text))[mappedIndices]
+
+else:
+    offset = np.resize(keys[0], len(mappedIndices))
+
+out = (text[mappedIndices] + offset) % len(mapRange)
+
+if not options["deleteTextOutsideMap"]:
+    text[mappedIndices] = out
+    out = text
+"""
+
+encryptedText = ApplyFormula(cipherQuery[3], mappedText, keys, mapRange, maskedIndices, options=options)
+```
 <h2>Other Core Functions</h2><a name="other"></a>
 
 <h3><b>CompressInverse</b>(<i>inverse</i>)</h3>
